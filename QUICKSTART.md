@@ -128,45 +128,69 @@ cd attestable-recorder
 
 ### Run Verification
 
+The verifier pins the APK signing certificate, so first get its SHA-256:
+
+```bash
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs app/build/outputs/apk/debug/app-debug.apk
+```
+
+Then verify (Warden needs internet once to fetch Google's attestation revocation list;
+add `--skip-revocation-check` to run offline):
+
 ```bash
 # Using gradle run
-./gradlew :server:run --args="../recordings/YOUR_RECORDING_ID_manifest.json ../recordings/"
+./gradlew :server:run --args="recordings/YOUR_RECORDING_ID_manifest.json recordings/ --signer <sha256-from-apksigner>"
 
 # Or using built executable
-./server/build/install/server/bin/server \
-    ../recordings/YOUR_RECORDING_ID_manifest.json \
-    ../recordings/
+./server/build/install/attestable-verifier/bin/attestable-verifier \
+    recordings/YOUR_RECORDING_ID_manifest.json \
+    recordings/ \
+    --signer <sha256-from-apksigner>
+
+# Just look at what the attestation record says, without applying any policy
+./server/build/install/attestable-verifier/bin/attestable-verifier --inspect recordings/YOUR_RECORDING_ID_manifest.json
 ```
+
+If your GrapheneOS device still has an **unlocked bootloader**, strict verification fails with
+`Bootloader not locked`. Relock it (GrapheneOS install guide, "Locking the bootloader") or, for
+a demo only, add `--allow-unlocked-bootloader`.
 
 ### Expected Output
 
 ```
-🔍 Verifying recording manifest: abc123_manifest.json
-📋 Recording ID: abc123-456-789
+🔍 Verifying recording: abc123-456-789
 📦 Chunks: 5
+🔐 Certificate chain: 5 certificates
 
-🔐 Certificate chain: 3 certificates
+⚙️  Verifying Android key attestation with Warden
+   Policy: package=com.attestable.recorder, strongBox=true, unlockedBootloaderAllowed=false, revocationCheck=true
+✅ Attestation verified
+   Attestation version: 300, KeyMint version: 300
+   Attestation security level: STRONGBOX
+   Key security level:         STRONGBOX
+   Challenge: fhSl1bDLwSmgRXZhurmNTksB3CqbaB766+YXerD+HVg=
+   App: com.attestable.recorder (versionCode 1)
+   APK signer SHA-256: 791f6c6f8303584eed777bf3b8c13664fb519e02eb96adc481c7ad8d791e7641
+   Bootloader locked: true
+   Verified boot state: SelfSigned
+   Verified boot key: d8f879d10419eddc9fcda6280718be763f6bf12299e1f72df3ea8ad8a8eb7f80 (GrapheneOS Pixel 10a)
+   OS version: 17.0.0
+   OS patch level: 2026-09
+   Key origin: GENERATED
 
-⚙️  Verifying Android key attestation with Warden...
-✅ Attestation verified:
-   - Hardware-backed: true
-   - Package: com.attestable.recorder
-   - Security level: STRONG_BOX
-
-🎵 Verifying audio chunk signatures...
-   ✅ Chunk 0: Valid (441000 bytes)
-   ✅ Chunk 1: Valid (441000 bytes)
-   ✅ Chunk 2: Valid (441000 bytes)
-   ✅ Chunk 3: Valid (441000 bytes)
-   ✅ Chunk 4: Valid (441000 bytes)
+🎵 Verifying audio chunk signatures with the attested key...
+   ✅ Chunk 0: valid (441000 bytes)
+   ✅ Chunk 1: valid (441000 bytes)
+   ✅ Chunk 2: valid (441000 bytes)
+   ✅ Chunk 3: valid (441000 bytes)
+   ✅ Chunk 4: valid (441000 bytes)
 
 📊 Verification complete: 5/5 chunks valid
 
 ✅ VERIFICATION SUCCESSFUL
    Recording ID: abc123-456-789
    Valid chunks: 5/5
-   Hardware-backed: true
-   Package: com.attestable.recorder
+   Key security level: STRONGBOX
 ```
 
 ## Step 7: Play Back Audio (Optional)
@@ -188,12 +212,18 @@ afplay chunk_0.wav
 
 ### "Attestation verification failed"
 
-**Issue**: Warden cannot verify certificate chain
+**Issue**: Warden rejected the attestation. The verifier prints the exact reason and a hint.
 
-**Solutions**:
-1. Ensure phone has internet on first key generation (downloads Google root CA)
-2. Check if bootloader is locked (unlocked bootloaders may fail strict verification)
-3. Verify GrapheneOS is up to date
+| Reason | Fix |
+|--------|-----|
+| `Bootloader not locked` | Relock the bootloader; or `--allow-unlocked-bootloader` for demos only |
+| verified boot key / state | Device runs an OS whose boot key is not trusted; add `--verified-boot-key <hex>` if you know it |
+| signer / signature digest | APK signer differs: get it via `apksigner verify --print-certs` and pass `--signer` |
+| StrongBox / security level | Key is TEE-backed; `--allow-tee` if acceptable |
+| challenge | Manifest from an old app version without `attestation_challenge`; pass `--challenge` or re-record |
+| revocation / network | Offline: add `--skip-revocation-check` |
+
+Use `--inspect <manifest>` to print the raw attestation record.
 
 ### "No such file or directory" when pulling files
 

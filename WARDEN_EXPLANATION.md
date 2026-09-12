@@ -1,4 +1,21 @@
-# Why We Didn't Use Warden (For Andrew Miller)
+# Why We Didn't Use Warden (historical note)
+
+> **Update (2026-09-12): fixed, and mis-addressed.** The verifier now uses Warden. Three corrections to the text below:
+>
+> 0. **Warden is A-SIT Plus's library, not Andrew Miller's.** The original memo (and the commit
+>    message that added it) conflated `github.com/amiller/warden` with `at.asitplus:warden`. The
+>    README suggestions below were never filed upstream and should not be, as written.
+> 1. The library is published by A-SIT Plus and now lives in
+>    [Warden Supreme](https://github.com/a-sit-plus/warden-supreme). The current Maven coordinates are
+>    `at.asitplus.warden:makoto` (Android + iOS) or `at.asitplus.warden:roboto` (Android only). The
+>    old `at.asitplus:warden` artifact tops out at 2.4.3 and is a relocation POM pointing to makoto;
+>    the `3.2.0` version mentioned below never existed.
+> 2. Warden Supreme requires Kotlin 2.4, so the project's Kotlin/AGP/Gradle versions were bumped.
+>
+> What the verifier checks now: chain to Google's root + revocation list, challenge, StrongBox,
+> package name, APK signer fingerprint, bootloader lock, and verified-boot key (GrapheneOS's
+> published keys are trusted). See `server/src/main/kotlin/com/attestable/verifier/WardenPolicy.kt`
+> and `HONEST_ASSESSMENT.md` for what is still missing.
 
 Hi Andrew,
 

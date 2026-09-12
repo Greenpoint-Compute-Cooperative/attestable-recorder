@@ -581,16 +581,16 @@ signature = ECDSA_sign(payload, titan_m2_key)
                     <div class="card">
                         <h3 style="margin-bottom: 1rem;">🖥️ Verifier Side</h3>
                         <ul style="font-size: 1.2rem; line-height: 2; list-style: none;">
-                            <li>• BouncyCastle (crypto)</li>
-                            <li>• X.509 chain validation</li>
-                            <li>• ECDSA verification</li>
-                            <li>• <strike>Warden</strike> (not available)</li>
+                            <li>• Warden (<code>at.asitplus.warden:makoto</code>)</li>
+                            <li>• Chain validation + Google revocation list</li>
+                            <li>• Attestation extension policy</li>
+                            <li>• ECDSA verification (BouncyCastle)</li>
                         </ul>
                     </div>
                 </div>
                 <p style="font-size: 1.3rem; margin-top: 2rem; opacity: 0.8;">
-                    Note: Initially planned to use Warden library for attestation verification,
-                    but implemented directly with BouncyCastle instead.
+                    Warden parses the Android Key Attestation extension and enforces: challenge,
+                    StrongBox, package name, APK signer, bootloader lock, verified-boot key.
                 </p>
             </div>
         </div>
@@ -775,7 +775,7 @@ signature = ECDSA_sign(payload, titan_m2_key)
                     </div>
                     <div class="flow-box" style="width: 90%; background: rgba(144, 238, 144, 0.3);">
                         <strong>5. Warden Verification</strong><br>
-                        Parse full attestation extension (we're missing this!)
+                        Parse full attestation extension (implemented)
                     </div>
                 </div>
             </div>
@@ -786,33 +786,32 @@ signature = ECDSA_sign(payload, titan_m2_key)
             <div class="content">
                 <h2>⚠️ Current Implementation Gaps</h2>
                 <p class="big-text" style="margin-bottom: 2rem; color: #FFB347;">
-                    Honest assessment of what's missing:
+                    Honest assessment of what's verified and what isn't:
                 </p>
                 <div class="grid-2">
                     <div class="card">
-                        <h3 style="margin-bottom: 1rem;">✅ What We Have</h3>
+                        <h3 style="margin-bottom: 1rem;">✅ Verified by Warden</h3>
                         <ul style="font-size: 1.1rem; line-height: 1.8; list-style: none;">
-                            <li>✓ Certificate chain validation</li>
-                            <li>✓ ECDSA signature verification</li>
-                            <li>✓ Audio hash checking</li>
-                            <li>✓ Basic issuer name check</li>
+                            <li>✓ Chain to Google root + revocation list</li>
+                            <li>✓ Attestation extension parsed</li>
+                            <li>✓ Challenge matches</li>
+                            <li>✓ Package name + APK signer pinned</li>
+                            <li>✓ StrongBox (Titan M2) proven</li>
+                            <li>✓ Bootloader locked, GrapheneOS boot key</li>
+                            <li>✓ ECDSA signatures with attested key</li>
                         </ul>
                     </div>
                     <div class="card">
-                        <h3 style="margin-bottom: 1rem;">❌ What We're Missing</h3>
+                        <h3 style="margin-bottom: 1rem;">❌ Still Missing</h3>
                         <ul style="font-size: 1.1rem; line-height: 1.8; list-style: none;">
-                            <li>✗ Attestation extension parsing</li>
-                            <li>✗ Challenge validation</li>
-                            <li>✗ Package name verification</li>
-                            <li>✗ Bootloader state check</li>
-                            <li>✗ Security patch validation</li>
-                            <li>✗ Hardware vs software proof</li>
-                        </ul>
+                                                        <li>✗ Minimum patch level not enforced</li>
+                            <li>✗ Reproducible builds / app logic proof</li>
+                                                    </ul>
                     </div>
                 </div>
                 <p style="font-size: 1.2rem; margin-top: 2rem; opacity: 0.9;">
-                    <strong>Why?</strong> Didn't use Warden library (used wrong Maven coordinates).
-                    Should be <code>at.asitplus:warden</code>, not <code>app.cash.warden</code>.
+                    <strong>Lesson learned:</strong> the correct coordinates are
+                    <code>at.asitplus.warden:makoto</code> (Warden Supreme), not <code>app.cash.warden</code>.
                 </p>
             </div>
         </div>
@@ -820,32 +819,31 @@ signature = ECDSA_sign(payload, titan_m2_key)
         <!-- Slide: How to Fix It -->
         <div class="slide">
             <div class="content">
-                <h2>How to Properly Implement</h2>
+                <h2>How It Is Implemented</h2>
                 <div class="code-block">
-// In server/build.gradle.kts, add:
+// server/build.gradle.kts
 dependencies {
-    implementation("at.asitplus:warden:3.2.0")
-    // ... other deps
+    implementation("at.asitplus.warden:makoto:1.1.4")   // Warden Supreme
 }
 
-// Then in Verifier.kt:
-import at.asitplus.android.attestation.*
-
-val attestation = AndroidAttestationChecker()
-val result = attestation.verifyAttestation(
-    certificateChain = certChain,
-    expectedPackageName = "com.attestable.recorder",
-    requireStrongBox = true,  // Titan M2
-    allowBootloaderUnlock = true
+// WardenPolicy.kt
+val config = AndroidAttestationConfiguration(
+    applications = listOf(AppData("com.attestable.recorder", signerFingerprints)),
+    requireStrongBox = true,                 // Titan M2
+    allowBootloaderUnlock = false,           // also enables verified-boot checks
+    verifiedBootKeys = grapheneOsKeys + VerifiedBootKey.OEM,
+    supremeParser = true,
 )
 
-if (result.isValid) {
-    // NOW we have real proof!
+// Verifier.kt
+val result = Makoto(config).android.verifyKeyAttestationBlocking(certChain, challenge)
+if (result.isSuccess) {
+    val attestedKey = result.attestedPublicKey   // use THIS key for chunk signatures
 }
                 </div>
                 <p class="big-text" style="margin-top: 1.5rem;">
-                    This would actually <span class="highlight">parse and validate</span>
-                    the attestation extension data.
+                    Warden <span class="highlight">parses and validates</span>
+                    the attestation extension; the verifier only trusts the key it returns.
                 </p>
             </div>
         </div>
@@ -858,20 +856,21 @@ if (result.isValid) {
                     What can you actually trust right now?
                 </p>
                 <div class="card" style="max-width: 900px;">
-                    <h3 style="margin-bottom: 1.5rem; color: #ffd700;">Current State (Without Proper Warden)</h3>
+                    <h3 style="margin-bottom: 1.5rem; color: #ffd700;">Current State (With Warden)</h3>
                     <ul style="font-size: 1.3rem; line-height: 2.2; list-style: none; text-align: left;">
                         <li>✅ Signatures are valid (mathematically proven)</li>
                         <li>✅ Audio hasn't been modified after signing</li>
-                        <li>✅ Certificate chain is structurally valid</li>
-                        <li>⚠️ Issuer says "StrongBox" but not cryptographically proven</li>
-                        <li>⚠️ App identity not verified</li>
-                        <li>❌ No proof app logic is correct</li>
-                        <li>❌ No protection against malicious app</li>
+                        <li>✅ Chain verified to Google's root, not revoked</li>
+                        <li>✅ Key proven to be in StrongBox (Titan M2)</li>
+                        <li>✅ App package + APK signer proven</li>
+                        <li>✅ Bootloader lock + GrapheneOS boot key checked</li>
+                        <li>✅ Verifier-issued, single-use challenge proves freshness</li>
+                        <li>❌ No proof app logic is correct / audio is real</li>
                     </ul>
                 </div>
                 <p style="font-size: 1.3rem; margin-top: 2rem;">
-                    <strong>Verdict:</strong> Better than nothing, but needs Warden + app signing
-                    + reproducible builds for full trust.
+                    <strong>Verdict:</strong> Attestation is now real. Remaining trust gap is
+                    reproducible builds with a custodied release key.
                 </p>
             </div>
         </div>

@@ -1,0 +1,11 @@
+.git
+.context
+.gradle
+build
+app/build
+server/build
+recordings
+challenges
+keystore.properties
+release.jks
+*.apk

@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Why Trust This Recording? — The Warden Policy and How to Cheat It</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1f4037 0%, #2c5364 50%, #0f2027 100%);
+            overflow: hidden;
+        }
+
+        .slideshow { width: 100vw; height: 100vh; position: relative; }
+
+        .slide {
+            position: absolute; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 0.5s ease-in-out;
+            padding: 3rem; color: white;
+            pointer-events: none;
+        }
+        .slide.active { opacity: 1; pointer-events: auto; }
+
+        h1 { font-size: 3.5rem; margin-bottom: 1.5rem; text-align: center; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+        h2 { font-size: 2.6rem; margin-bottom: 1.5rem; text-align: center; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+        h3 { font-size: 1.4rem; margin-bottom: 0.8rem; }
+
+        .content {
+            max-width: 1300px; width: 100%; max-height: 88vh; overflow-y: auto;
+            background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(10px);
+            border-radius: 20px; padding: 2.5rem; border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .big-text { font-size: 1.8rem; line-height: 1.6; text-align: center; }
+        .sub { font-size: 1.15rem; line-height: 1.6; opacity: 0.9; }
+
+        .flow-diagram { display: flex; align-items: center; justify-content: center; margin: 1.5rem 0; flex-wrap: wrap; }
+        .flow-box {
+            background: rgba(255, 255, 255, 0.12); padding: 1rem 1.2rem; border-radius: 12px; margin: 0.5rem;
+            min-width: 160px; text-align: center; border: 2px solid rgba(255, 255, 255, 0.3); font-size: 1.05rem;
+        }
+        .flow-box small { display: block; opacity: 0.75; font-size: 0.85rem; margin-top: 0.3rem; }
+        .flow-arrow { font-size: 2rem; margin: 0 0.5rem; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem; margin: 1.5rem 0; }
+        .card { background: rgba(255, 255, 255, 0.1); padding: 1.5rem; border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .card.good { border-color: rgba(144, 238, 144, 0.7); background: rgba(144, 238, 144, 0.12); }
+        .card.bad { border-color: rgba(255, 99, 71, 0.7); background: rgba(255, 99, 71, 0.12); }
+        .card.warn { border-color: rgba(255, 179, 71, 0.8); background: rgba(255, 179, 71, 0.12); }
+
+        ul.plain { list-style: none; font-size: 1.15rem; line-height: 1.9; }
+        ul.plain li { padding-left: 0.2rem; }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.55); padding: 1.2rem; border-radius: 10px;
+            font-family: 'SF Mono', 'Courier New', monospace; font-size: 1rem; line-height: 1.5;
+            margin: 1rem 0; text-align: left; overflow-x: auto; white-space: pre;
+        }
+        .code-block .ok { color: #90ee90; }
+        .code-block .no { color: #ff7f7f; }
+        .code-block .dim { opacity: 0.6; }
+
+        .highlight { color: #ffd700; font-weight: bold; }
+        .chip {
+            display: inline-block; background: rgba(255, 215, 0, 0.25); padding: 0.3rem 0.8rem;
+            border-radius: 20px; border: 1px solid #ffd700; margin: 0.2rem; font-size: 0.95rem;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 1.05rem; margin-top: 1rem; }
+        th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.2); vertical-align: top; }
+        th { background: rgba(255,255,255,0.12); }
+        td.cost-low { color: #ff7f7f; font-weight: bold; }
+        td.cost-mid { color: #ffb347; font-weight: bold; }
+        td.cost-high { color: #90ee90; font-weight: bold; }
+
+        .controls { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); display: flex; gap: 1rem; z-index: 1000; }
+        button {
+            background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 0.8rem 1.6rem;
+            font-size: 1.1rem; border-radius: 50px; cursor: pointer; transition: all 0.3s ease; backdrop-filter: blur(10px);
+        }
+        button:hover { background: rgba(255, 255, 255, 0.3); transform: scale(1.05); }
+        .slide-counter {
+            position: fixed; top: 1.5rem; right: 1.5rem; font-size: 1.2rem; color: white;
+            background: rgba(0, 0, 0, 0.3); padding: 0.7rem 1.2rem; border-radius: 50px; backdrop-filter: blur(10px); z-index: 1000;
+        }
+        .emoji-big { font-size: 4rem; margin-bottom: 1rem; text-align: center; }
+        .center { text-align: center; }
+    </style>
+</head>
+<body>
+<div class="slideshow">
+
+    <!-- 1 Title -->
+    <div class="slide active">
+        <div class="content">
+            <div class="emoji-big">🔐</div>
+            <h1>Why Trust This Recording?</h1>
+            <p class="big-text">The Warden attestation policy — and every way we know to cheat it</p>
+            <p class="big-text" style="margin-top: 1.5rem; font-size: 1.3rem; opacity: 0.85;">
+                Attestable Audio Recorder · GrapheneOS · Pixel 10a · Titan M2 · Warden Supreme 1.1.4
+            </p>
+        </div>
+    </div>
+
+    <!-- 2 The claim -->
+    <div class="slide">
+        <div class="content">
+            <h2>The Claim We Are Making</h2>
+            <p class="big-text" style="margin-bottom: 1.5rem;">
+                "This audio and video was signed, chunk by chunk, by a key that lives inside the
+                <span class="highlight">Titan M2 chip</span> of a specific Pixel, on behalf of
+                <span class="highlight">our unmodified app</span>, running on an
+                <span class="highlight">unmodified OS</span> — and nobody changed a byte afterwards."
+            </p>
+            <div class="grid-2">
+                <div class="card good">
+                    <h3>✅ What this deck argues</h3>
+                    <p class="sub">Every part of that sentence is now checked cryptographically by Warden against a policy we control, not by reading names off a certificate.</p>
+                </div>
+                <div class="card bad">
+                    <h3>❌ What it does not claim</h3>
+                    <p class="sub">That the sound reaching the microphone was real, or that the recording was made recently. Those are the cheap attacks, and we'll be honest about them.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3 What the verifier receives -->
+    <div class="slide">
+        <div class="content">
+            <h2>What the Verifier Receives</h2>
+            <p class="sub center" style="margin-bottom: 1rem;">One manifest plus the raw PCM chunks and MP4 segments. Nothing else. No trust in the phone's word.</p>
+            <div class="code-block">{
+  "manifest_version": 4,
+  "recording_id": "6b204ccd-44ea-4150-8507-1f28d41f46b7",
+  "package_name": "com.attestable.recorder",
+  "attestation_challenge": "JOCv9GqSQ4YRAUhshQaUy4pvstao7MimrZNjtNH7HXs=", "challenge_source": "verifier",
+  "attestation_chain": "MIIC…",          <span class="dim">← 5 X.509 certificates, leaf first</span>
+  "streams": { "audio": { "codec": "pcm_s16le", "sample_rate": 44100 }, "video": { "codec": "h264", "width": 1280, "height": 720 } },
+  "chunks": [
+    { "type": "audio", "index": 0, "file": "…_chunk_0.pcm",  "timestamp": …, "duration_ms": 5000, "hash": "…", "prev_hash": "0000…", "signature": "…" },
+    { "type": "video", "index": 1, "file": "…_video_1.mp4", "timestamp": …, "duration_ms": 4654, "hash": "…", "prev_hash": "<hash of video 0>", "signature": "…" }, …
+  ],
+  "context": [ { "phase": "start", "debuggable": false, "install_source": null, "accessibility_services": "", "other_active_recorders": 0, … }, … ],
+  "session_signature": "…"               <span class="dim">← signs the ordered chunk list + context digest</span>
+}</div>
+            <p class="sub center">Per chunk the Titan M2 signs <code>"ATREC" ‖ 4 ‖ type ‖ recording_id ‖ index ‖ timestamp ‖ duration ‖ SHA-256(bytes) ‖ SHA-256(previous chunk)</code>: a hash chain per stream.
+                The interesting part is the certificate chain: its leaf carries the <span class="highlight">Android Key Attestation extension</span>.</p>
+        </div>
+    </div>
+
+    <!-- 4 Chain of trust -->
+    <div class="slide">
+        <div class="content">
+            <h2>The Chain of Trust (as seen on the Pixel 10a)</h2>
+            <div class="flow-diagram">
+                <div class="flow-box">🏛️ Google<br>Key Attestation CA1<small>self-signed root, published by Google</small></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">Droid CA2<small>valid 2026–2029</small></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">Droid CA3<small>valid ~2 months</small></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">🔒 StrongBox<br>5fed1223…<small>this device's attestation key, valid 2 weeks (remote key provisioning)</small></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">🔑 Android Keystore Key<small>our signing key + attestation extension</small></div>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Who signed what</h3>
+                    <p class="sub">The leaf is signed by a key that only exists inside the Titan M2. That key's certificate is signed by Google, freshly, every couple of weeks. Google's root is pinned inside Warden.</p>
+                </div>
+                <div class="card">
+                    <h3>Why the short validity matters</h3>
+                    <p class="sub">Leaked device attestation keys ("keyboxes") are a real problem in the Android ecosystem. Short-lived, remotely provisioned certificates plus Google's revocation list limit the blast radius of a leak.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5 The extension -->
+    <div class="slide">
+        <div class="content">
+            <h2>What the Attestation Extension Says</h2>
+            <p class="sub center" style="margin-bottom: 0.5rem;">Real output from <code>server --inspect</code> on the recording above. Every line is inside the leaf certificate, signed by the Titan M2.</p>
+            <div class="code-block">Attestation security level: <span class="ok">STRONGBOX</span>
+Key security level:         <span class="ok">STRONGBOX</span>
+Challenge:                  <span class="ok">JOCv9GqSQ4YRAUhshQaUy4pvstao7MimrZNjtNH7HXs=</span>   <span class="dim">= manifest</span>
+App:                        <span class="ok">com.attestable.recorder (versionCode 1)</span>
+APK signer SHA-256:         <span class="ok">70e16aec7ec458e582e8cb1a5f00a3c6fd77ba2a65b80ffb475927c1c44249d9</span>  <span class="dim">release key</span>
+Bootloader locked:          <span class="ok">true</span>
+Verified boot state:        <span class="ok">SelfSigned</span>       <span class="dim">GrapheneOS signs its own OS</span>
+Verified boot key:          <span class="ok">d8f879d1…eb7f80</span>  <span class="dim">= GrapheneOS Pixel 10a</span>
+OS version: 17.0.0     OS / vendor / boot patch level: 2026-09
+Key origin: GENERATED</div>
+            <p class="sub center">
+                The app never wrote these values. The OS keystore fills them in, and the <span class="highlight">StrongBox chip signs them</span>.
+                "SelfSigned" is not a warning: it means the OS was signed by GrapheneOS's key, which the policy explicitly trusts.
+            </p>
+        </div>
+    </div>
+
+    <!-- 6 The policy -->
+    <div class="slide">
+        <div class="content">
+            <h2>The Warden Policy</h2>
+            <div class="code-block">AndroidAttestationConfiguration(
+    applications = listOf(AppData(
+        packageName        = "com.attestable.recorder",
+        signerFingerprints = setOf(70e16aec…49d9)        <span class="dim">// pinned release signing cert</span>
+    )),
+    requireStrongBox      = true,                          <span class="dim">// Titan M2, not TEE, not software</span>
+    allowBootloaderUnlock = false,                         <span class="dim">// also enables the two lines below</span>
+    verifiedBootKeys      = grapheneOsKeys + VerifiedBootKey.OEM,
+    revocation            = listOf(GoogleDefaultLoaderConfig),
+    supremeParser         = true,
+)
+Makoto(config).android.verifyKeyAttestationBlocking(certChain, challenge)</div>
+            <div class="grid-3">
+                <div class="card good"><h3>Chain</h3><p class="sub">Path-validated to Google's root, every serial checked against Google's revocation list.</p></div>
+                <div class="card good"><h3>Extension</h3><p class="sub">Challenge, security level, package, signer, boot state, boot key — all compared to policy.</p></div>
+                <div class="card good"><h3>Output</h3><p class="sub">The <em>attested</em> public key. Chunk signatures are checked with that key and no other.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7 Check by check: what each proves and what faking it costs -->
+    <div class="slide">
+        <div class="content">
+            <h2>Check by Check: What Would It Take to Fake It?</h2>
+            <table>
+                <tr><th>Check</th><th>What it proves</th><th>To forge it you would need…</th></tr>
+                <tr><td>Chain to Google root + revocation</td><td>The attesting key was provisioned by Google into real hardware</td><td>Google's CA private key, or an unrevoked leaked device key</td></tr>
+                <tr><td>Security level = STRONGBOX</td><td>Our signing key was generated in, and never leaves, the Titan M2</td><td>To break the Titan M2, or to make software/TEE report "StrongBox" (the level is asserted by the chip itself)</td></tr>
+                <tr><td>Challenge matches</td><td>The key was generated for <em>this</em> challenge</td><td>Control of the key at generation time — trivial if the app picks the challenge (see later)</td></tr>
+                <tr><td>Package + APK signer</td><td>The key belongs to an APK signed with our certificate</td><td>Our signing key, or an OS that lies to the keystore about who the caller is</td></tr>
+                <tr><td>Bootloader locked + verified-boot key</td><td>The OS was booted from an image signed by Google or GrapheneOS</td><td>An unlock (visible), a signing key of GrapheneOS/Google, or a bootloader exploit</td></tr>
+                <tr><td>Chunk signatures with the attested key</td><td>Each chunk was hashed and signed by that key on that device</td><td>To get the app to sign your data for you</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- 8 The argument to a skeptic -->
+    <div class="slide">
+        <div class="content">
+            <h2>The Argument, Compressed</h2>
+            <p class="big-text" style="margin-bottom: 1.5rem;">To produce a recording that passes strict verification and was <em>not</em> made by our app on real hardware, an attacker must do <span class="highlight">one</span> of:</p>
+            <div class="grid-2">
+                <div class="card"><h3>💎 Break the Titan M2</h3><p class="sub">Extract a key from a chip designed against physical and side-channel attacks. Nation-state budget, per device.</p></div>
+                <div class="card"><h3>🏛️ Compromise Google's attestation PKI</h3><p class="sub">Or obtain a leaked device key before Google revokes it. Rare, noisy, and short-lived by design.</p></div>
+                <div class="card"><h3>🐛 Exploit the keystore / bootloader</h3><p class="sub">A zero-day that lets a modified OS boot as "Verified", or lets one app impersonate another to KeyMint. Patch level is attested, so this is bounded in time.</p></div>
+                <div class="card warn"><h3>🎤 …or just fool the app</h3><p class="sub">Give the legitimate app fake input. This needs no crypto at all — and it is where the honest discussion starts.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 9 Cheat 1: the microphone -->
+    <div class="slide">
+        <div class="content">
+            <h2>Cheat #1 — Feed the Microphone</h2>
+            <div class="grid-2">
+                <div class="card bad">
+                    <h3>The attack</h3>
+                    <p class="sub">Play a deepfake, a TTS clip, or an edited conversation through a speaker next to the phone. Press record. Every check passes, because <strong>every check is true</strong>: real chip, real app, real OS, real signature.</p>
+                    <p class="sub" style="margin-top:0.6rem;"><span class="chip">Cost: a speaker</span> <span class="chip">Detected: never, by attestation</span></p>
+                </div>
+                <div class="card">
+                    <h3>Why attestation can't help</h3>
+                    <p class="sub">Attestation proves <em>who signed</em> and <em>on what</em>. It says nothing about the physics in front of the microphone. This is the fundamental ceiling of the whole approach.</p>
+                    <h3 style="margin-top:1rem;">Mitigations (none cryptographic)</h3>
+                    <ul class="plain">
+                        <li>• Liveness: prompt-response, verifier-issued spoken nonce</li>
+                        <li>• Multiple witnesses: several attested devices, cross-check</li>
+                        <li>• Context: attested time, location, other sensors</li>
+                        <li>• Forensics on the audio itself</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 10 Cheat 2: stale challenge -->
+    <div class="slide">
+        <div class="content">
+            <h2>Cheat #2 — The App Picks Its Own Challenge</h2>
+            <div class="grid-2">
+                <div class="card warn">
+                    <h3>The attack (before the fix)</h3>
+                    <p class="sub">If the app draws its own 32 random bytes and writes them into the manifest, Warden's challenge check always passes — the same party chose both sides. A key generated months ago is indistinguishable from one generated today.</p>
+                    <p class="sub" style="margin-top:0.6rem;"><span class="chip">Cost: none</span> <span class="chip">Status: closed 2026-09-12</span></p>
+                </div>
+                <div class="card good">
+                    <h3>The fix (implemented and tested on the Pixel 10a)</h3>
+                    <div class="code-block" style="font-size:0.95rem;">server issue-challenge         <span class="dim">→ C, 30-min TTL, stored</span>
+adb … --es challenge C          <span class="dim">or typed into the app</span>
+generateKey(challenge = C)      <span class="dim">manifest: challenge_source=verifier</span>
+server … --require-issued-challenge
+<span class="ok">✅ key generated after 19:32:53Z; challenge consumed</span>
+<span class="no">❌ second recording with C: "already used"</span></div>
+                    <p class="sub">Freshness is now a lower bound the verifier chose itself. Remaining assumption: the store is local to one verifier instance.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 11 Cheat 3: unlocked bootloader -->
+    <div class="slide">
+        <div class="content">
+            <h2>Cheat #3 — Modified OS on an Unlocked Bootloader</h2>
+            <div class="grid-2">
+                <div class="card bad">
+                    <h3>The attack</h3>
+                    <p class="sub">Unlock the bootloader, flash an OS that lies. The Titan M2 still signs honestly — but the <em>package name and signer</em> in the extension are supplied to it by the OS keystore. A malicious OS can claim any app generated the key, inject audio into <code>AudioRecord</code>, or sign arbitrary data with the app's key.</p>
+                    <p class="sub" style="margin-top:0.6rem;">The hardware's answer: it also records <strong>bootloader locked</strong> and the <strong>verified-boot key</strong> the bootloader reported. Warden rejects the attestation unless the OS came from a trusted key.</p>
+                </div>
+                <div class="card warn">
+                    <h3>What we saw on the test phone</h3>
+                    <div class="code-block" style="font-size:0.95rem;"><span class="dim">before relocking:</span>
+<span class="no">❌ Attestation rejected by Warden
+   Reason: Bootloader not locked</span>
+<span class="dim">after relocking:</span>
+<span class="ok">✅ Bootloader locked: true
+   Verified boot state: SelfSigned (GrapheneOS Pixel 10a)</span></div>
+                    <p class="sub">Strict mode was <strong>right</strong> to reject the unlocked phone. The demo flag <code>--allow-unlocked-bootloader</code> turns off the lock, boot-state <em>and</em> boot-key checks in one go — which means the package/signer lines can no longer be trusted either. Never use it outside a demo.</p>
+                    <p class="sub" style="margin-top:0.6rem;">Relocking the bootloader (a factory reset) fixed it; GrapheneOS's published boot keys were already trusted.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 12 Cheat 4: app identity -->
+    <div class="slide">
+        <div class="content">
+            <h2>Cheat #4 — A Different App, or a Different Build</h2>
+            <div class="grid-3">
+                <div class="card good">
+                    <h3>Same package name, other signer</h3>
+                    <p class="sub">Rejected. The signer fingerprint is in the extension and pinned in the policy. Re-signing an APK changes the fingerprint.</p>
+                </div>
+                <div class="card warn">
+                    <h3>Our key, modified code (the "evil twin")</h3>
+                    <p class="sub">Passes. Tag 709 proves <em>who holds the key</em>, not <em>what ran</em>. The release build now uses a dedicated non-debug key, but that key is still a file on a laptop.</p>
+                    <p class="sub" style="margin-top:0.5rem;">Fix: an <em>encumbered</em> key in a TEE/HSM that only signs reproducible canonical builds — turns signer-binding into code-binding without leaving stock GrapheneOS.</p>
+                </div>
+                <div class="card warn">
+                    <h3>Old, vulnerable version</h3>
+                    <p class="sub">The extension carries the app's versionCode and the OS patch level. The policy does not yet enforce minimums (<code>appVersion</code>, <code>patchLevel</code> in Warden). Easy to add.</p>
+                </div>
+            </div>
+            <p class="sub center">Attestation binds the key to an <em>identity</em>. Whether that identity behaves is a question of code review, reproducible builds and transparency — not of cryptography.</p>
+        </div>
+    </div>
+
+    <!-- 13 Cheat 5: leaked keys and hardware -->
+    <div class="slide">
+        <div class="content">
+            <h2>Cheat #5 — Leaked Device Keys and Hardware Attacks</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3>🔓 Leaked attestation keys ("keyboxes")</h3>
+                    <p class="sub">Real in the wild for TEE-level attestation: extracted keys let emulators pass integrity checks. StrongBox keys are far harder to extract, this chain uses remotely provisioned two-week certificates, and Warden queries Google's revocation list on every run.</p>
+                    <p class="sub" style="margin-top:0.5rem;">Hardening not yet enabled: <code>requireRemoteKeyProvisioning = true</code> rejects chains from factory-provisioned keys entirely.</p>
+                </div>
+                <div class="card">
+                    <h3>💎 Attacking the Titan M2</h3>
+                    <p class="sub">Fault injection, decapping, side channels. This is the threat model the chip was built for; a working attack is worth far more than one faked recording. Treat as out of scope, but say so.</p>
+                    <p class="sub" style="margin-top:0.5rem;">Note also: firmware bugs below the OS (bootloader, TEE) would not be visible to attestation until patched — the patch level in the extension lets you refuse old firmware.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14 Cheat 6: the verifier -->
+    <div class="slide">
+        <div class="content">
+            <h2>Cheat #6 — Attack the Verifier Instead</h2>
+            <div class="grid-2">
+                <div class="card bad">
+                    <h3>Weak flags</h3>
+                    <div class="code-block" style="font-size:0.95rem;">--allow-unlocked-bootloader   <span class="no">disables all boot checks</span>
+--allow-tee                   <span class="no">accepts non-StrongBox keys</span>
+--skip-revocation-check       <span class="no">accepts revoked devices</span>
+(no --require-issued-challenge) <span class="no">accepts app-chosen challenges</span></div>
+                    <p class="sub">The policy is only as strong as the flags used. A "temporary" demo flag in a production script is a full bypass.</p>
+                </div>
+                <div class="card">
+                    <h3>Trusting the wrong things</h3>
+                    <ul class="plain">
+                        <li>• Don't read the public key off the leaf yourself — use the key Warden returns (the old verifier got this wrong)</li>
+                        <li>• Don't trust subject names like "O=StrongBox"; trust the attested security level</li>
+                        <li>• Pin the signer; don't just check the package name</li>
+                        <li>• Log the full attestation summary with every verdict so verdicts are auditable</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 15 Threat matrix -->
+    <div class="slide">
+        <div class="content">
+            <h2>The Whole Board</h2>
+            <table>
+                <tr><th>Attack</th><th>Cost</th><th>Caught by</th><th>Status</th></tr>
+                <tr><td>Play fake audio at the mic</td><td class="cost-low">trivial</td><td>nothing in attestation</td><td>open by nature — needs liveness / witnesses</td></tr>
+                <tr><td>Reuse an old key (stale challenge)</td><td class="cost-low">trivial</td><td>verifier-issued, single-use challenge</td><td>✅ rejected with <code>--require-issued-challenge</code></td></tr>
+                <tr><td>Drop a middle chunk, keep the rest</td><td class="cost-low">trivial</td><td>per-stream hash chain + session record</td><td>✅ rejected</td></tr>
+                <tr><td>Edit the recorded OS context</td><td class="cost-low">trivial</td><td>context digest inside the session signature</td><td>✅ rejected</td></tr>
+                <tr><td>Modified OS, unlocked bootloader</td><td class="cost-low">easy</td><td>bootloader lock + verified-boot key</td><td>✅ rejected in strict mode (test phone relocked, now passes)</td></tr>
+                <tr><td>Rooted / custom OS, locked bootloader</td><td class="cost-mid">needs an OS signing key</td><td>verified-boot key allow-list</td><td>✅ rejected</td></tr>
+                <tr><td>Different app, same package name</td><td class="cost-low">easy</td><td>APK signer fingerprint</td><td>✅ rejected</td></tr>
+                <tr><td>Malicious build with our signing key (evil twin)</td><td class="cost-mid">steal release.jks</td><td>encumbered key + reproducible builds</td><td>open — release key done, custody not</td></tr>
+                <tr><td>Software / TEE key claiming hardware</td><td class="cost-mid">—</td><td>STRONGBOX security level</td><td>✅ rejected</td></tr>
+                <tr><td>Leaked device attestation key</td><td class="cost-mid">buy on grey market</td><td>Google revocation list, 2-week certs</td><td>✅ checked; RKP requirement optional</td></tr>
+                <tr><td>Keystore / bootloader zero-day</td><td class="cost-high">expensive</td><td>attested patch level (not enforced yet)</td><td>partial</td></tr>
+                <tr><td>Break the Titan M2</td><td class="cost-high">nation-state</td><td>—</td><td>out of scope</td></tr>
+                <tr><td>Verifier misconfigured</td><td class="cost-low">a typo</td><td>process</td><td>document, review, log</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- 16 What to do next -->
+    <div class="slide">
+        <div class="content">
+            <h2>Closing the Cheap Gaps</h2>
+            <div class="grid-2">
+                <div class="card good">
+                    <h3>Do now</h3>
+                    <ul class="plain">
+                        <li>1. ✅ Relock the test phone's bootloader — done, strict mode passes</li>
+                        <li>2. ✅ Verifier-issued challenge — done (text field + adb intent; QR still to do)</li>
+                        <li>3. ✅ Release signing key — done; custody (TEE/HSM) and published fingerprint still open</li>
+                        <li>4. Enforce minimum <code>patchLevel</code> and <code>appVersion</code></li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Do next</h3>
+                    <ul class="plain">
+                        <li>5. Reproducible builds so anyone can rebuild and match the APK</li>
+                        <li>6. <code>requireRemoteKeyProvisioning = true</code></li>
+                        <li>7. Liveness: spoken nonce inside the recording itself</li>
+                        <li>8. Multiple attested witnesses; on-chain registration via TEE Interop</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 17 Bottom line -->
+    <div class="slide">
+        <div class="content">
+            <h2>Bottom Line</h2>
+            <p class="big-text" style="margin-bottom: 1.5rem;">
+                With the Warden policy, a passing recording means:
+                a <span class="highlight">specific Pixel's Titan M2</span> signed these exact bytes on behalf of
+                <span class="highlight">our app, signed by our key</span>, on an OS booted from
+                <span class="highlight">Google's or GrapheneOS's key</span>, and nobody has touched them since.
+            </p>
+            <div class="grid-2">
+                <div class="card good">
+                    <h3>Convincing because</h3>
+                    <p class="sub">Every claim is asserted by hardware and chains to a public root; Warden checks each one against an explicit policy and we only trust the key it hands back.</p>
+                </div>
+                <div class="card bad">
+                    <h3>Not convincing about</h3>
+                    <p class="sub">Whether the sound was genuine. That needs liveness and independent witnesses — not more cryptography on the phone.</p>
+                </div>
+            </div>
+            <p class="sub center" style="margin-top:1rem;">Details: <code>HONEST_ASSESSMENT.md</code> · policy: <code>server/src/main/kotlin/com/attestable/verifier/WardenPolicy.kt</code></p>
+        </div>
+    </div>
+
+</div>
+
+<div class="slide-counter"><span id="currentSlide">1</span> / <span id="totalSlides"></span></div>
+<div class="controls">
+    <button id="prevBtn">← Previous</button>
+    <button id="nextBtn">Next →</button>
+</div>
+
+<script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    document.getElementById('totalSlides').textContent = totalSlides;
+
+    function showSlide(n) {
+        slides[currentSlide].classList.remove('active');
+        currentSlide = (n + totalSlides) % totalSlides;
+        slides[currentSlide].classList.add('active');
+        document.getElementById('currentSlide').textContent = currentSlide + 1;
+        slides[currentSlide].querySelector('.content')?.scrollTo(0, 0);
+        history.replaceState(null, '', '#' + (currentSlide + 1));
+    }
+
+    // Deep links: warden-trust-model.html#7 opens slide 7
+    const fromHash = parseInt(location.hash.slice(1), 10);
+    if (fromHash >= 1 && fromHash <= totalSlides) showSlide(fromHash - 1);
+
+    document.getElementById('prevBtn').addEventListener('click', (e) => { e.stopPropagation(); showSlide(currentSlide - 1); });
+    document.getElementById('nextBtn').addEventListener('click', (e) => { e.stopPropagation(); showSlide(currentSlide + 1); });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); showSlide(currentSlide - 1); }
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); showSlide(currentSlide + 1); }
+    });
+
+    // Click right 40% to advance, left 40% to go back (text selection in the middle still works)
+    document.querySelector('.slideshow').addEventListener('click', (e) => {
+        if (e.target.closest('.content')) return;
+        const width = window.innerWidth;
+        if (e.clientX > width * 0.6) showSlide(currentSlide + 1);
+        else if (e.clientX < width * 0.4) showSlide(currentSlide - 1);
+    });
+</script>
+</body>
+</html>
