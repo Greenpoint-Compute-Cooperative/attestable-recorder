@@ -57,12 +57,12 @@ attestable-recorder/
 
 ### Server Verifier
 - **Language**: Kotlin (JVM)
-- **Framework**: [Warden](https://github.com/amiller/warden) v1.0.1
+- **Framework**: [Warden Supreme](https://github.com/a-sit-plus/warden-supreme) `at.asitplus.warden:makoto:1.1.4`
 - **JDK**: 17+
 - **Verification**:
-  - Android key attestation certificate chains
-  - Google root CA validation
-  - StrongBox (Titan M2) confirmation
+  - Android key attestation certificate chains + Google revocation list
+  - Attestation extension policy: challenge, package, APK signer, StrongBox (Titan M2),
+    bootloader lock, verified-boot key (GrapheneOS keys trusted)
   - ECDSA signature verification
 
 ## How It Works
@@ -99,9 +99,9 @@ KeyGenParameterSpec.Builder(KEY_ALIAS, PURPOSE_SIGN)
 ```kotlin
 // Server verifies:
 1. Load attestation certificate chain from manifest
-2. Use Warden to verify chain (up to Google root CA)
-3. Confirm StrongBox security level (Titan M2)
-4. Extract public key from certificate
+2. Warden verifies chain (up to Google root CA) and parses the attestation extension
+3. Warden enforces policy: challenge, StrongBox (Titan M2), package, APK signer, bootloader
+4. Use the *attested* public key returned by Warden
 5. For each chunk:
    a. Reconstruct payload
    b. Verify ECDSA signature
@@ -242,10 +242,10 @@ See `TEE_INTEROP.md` for details.
 - cbor:0.9
 
 ### Server
-- warden-roboto:1.0.1 (Android attestation)
+- at.asitplus.warden:makoto:1.1.4 (Warden — Android attestation)
 - kotlin-stdlib
 - json:20231013
-- bouncycastle:bcpkix:1.77
+- bouncycastle:bcpkix:1.84
 
 ## Building
 
@@ -286,7 +286,7 @@ Areas for improvement:
 
 ## Resources
 
-- [Warden GitHub](https://github.com/amiller/warden)
+- [Warden Supreme GitHub](https://github.com/a-sit-plus/warden-supreme)
 - [TEE Interop](https://teleport-computer.github.io/tee-interop/)
 - [Android Key Attestation](https://source.android.com/docs/security/features/keystore/attestation)
 - [GrapheneOS](https://grapheneos.org/)

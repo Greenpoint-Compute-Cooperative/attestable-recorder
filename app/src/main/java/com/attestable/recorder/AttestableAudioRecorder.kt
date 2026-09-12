@@ -3,249 +3,98 @@ package com.attestable.recorder
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.util.Base64
 import android.util.Log
-import org.json.JSONArray
-import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
-import java.nio.ByteBuffer
-import java.security.MessageDigest
-import java.util.*
+import java.util.UUID
 import kotlin.concurrent.thread
 
 /**
- * Records audio from microphone and creates cryptographic attestations
- * Each audio chunk is signed with hardware-backed key
+ * Records raw PCM from the microphone and hands every 5-second chunk to the [ChunkSigner].
+ * Each chunk is written to `<recordingId>_chunk_<n>.pcm` (16-bit little-endian mono, 44.1 kHz).
  */
 class AttestableAudioRecorder(
-    private val attestationManager: AttestationManager,
-    private val outputDir: File
+    private val signer: ChunkSigner,
+    private val recordingId: UUID,
+    private val outputDir: File,
+    private val onChunk: (ChunkRecord) -> Unit,
 ) {
     companion object {
         private const val TAG = "AttestableAudioRecorder"
-        private const val SAMPLE_RATE = 44100
-        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
-        private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
-        private const val CHUNK_DURATION_MS = 5000 // 5 second chunks
+        const val SAMPLE_RATE = 44100
+        const val CHANNELS = 1
+        const val BITS_PER_SAMPLE = 16
+        const val CHUNK_DURATION_MS = 5000
+        private const val BYTES_PER_SECOND = SAMPLE_RATE * CHANNELS * (BITS_PER_SAMPLE / 8)
+        private const val BYTES_PER_CHUNK = BYTES_PER_SECOND * CHUNK_DURATION_MS / 1000
+
+        fun fileName(recordingId: UUID, index: Int) = "${recordingId}_chunk_$index.pcm"
     }
 
     private var audioRecord: AudioRecord? = null
-    private var isRecording = false
+    @Volatile private var isRecording = false
     private var recordingThread: Thread? = null
-    private val recordingId = UUID.randomUUID().toString()
-    private val chunks = mutableListOf<AudioChunkAttestation>()
 
     private val bufferSize = AudioRecord.getMinBufferSize(
-        SAMPLE_RATE,
-        CHANNEL_CONFIG,
-        AUDIO_FORMAT
+        SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
     ) * 2
 
-    /**
-     * Start recording with attestation
-     */
-    fun startRecording(): RecordingResult {
-        if (isRecording) {
-            return RecordingResult.Error("Already recording")
-        }
-
-        try {
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                SAMPLE_RATE,
-                CHANNEL_CONFIG,
-                AUDIO_FORMAT,
-                bufferSize
+    fun start(): String? {
+        if (isRecording) return "Already recording"
+        return try {
+            val record = AudioRecord(
+                MediaRecorder.AudioSource.MIC, SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize
             )
-
-            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                return RecordingResult.Error("Failed to initialize AudioRecord")
-            }
-
-            audioRecord?.startRecording()
+            if (record.state != AudioRecord.STATE_INITIALIZED) return "Failed to initialize AudioRecord"
+            audioRecord = record
+            RecordingContext.ownAudioSessionId = record.audioSessionId
+            record.startRecording()
             isRecording = true
-
-            // Start recording thread
-            recordingThread = thread(start = true) {
-                recordAudioLoop()
-            }
-
-            Log.d(TAG, "Started recording session: $recordingId")
-            return RecordingResult.Success("Recording started")
-
+            recordingThread = thread(start = true, name = "audio-capture") { recordAudioLoop() }
+            null
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start recording", e)
-            return RecordingResult.Error(e.message ?: "Unknown error")
+            Log.e(TAG, "Failed to start audio", e)
+            e.message ?: "Unknown error"
         }
     }
 
-    /**
-     * Stop recording and finalize attestation manifest
-     */
-    fun stopRecording(): RecordingManifest? {
-        if (!isRecording) {
-            return null
-        }
-
+    fun stop() {
+        if (!isRecording) return
         isRecording = false
         recordingThread?.join(5000)
-
-        audioRecord?.apply {
-            stop()
-            release()
-        }
+        audioRecord?.apply { stop(); release() }
         audioRecord = null
-
-        Log.d(TAG, "Stopped recording. Captured ${chunks.size} chunks")
-
-        return RecordingManifest(
-            recordingId = recordingId,
-            chunks = chunks.toList(),
-            attestationInfo = attestationManager.getAttestationInfo(),
-            timestamp = System.currentTimeMillis()
-        )
     }
 
-    /**
-     * Main recording loop - captures and signs chunks
-     */
     private fun recordAudioLoop() {
         val buffer = ByteArray(bufferSize)
-        val chunkBuffer = mutableListOf<Byte>()
-        val samplesPerChunk = (SAMPLE_RATE * CHUNK_DURATION_MS / 1000) * 2 // 16-bit = 2 bytes
+        val chunk = ByteArrayOutputStream(BYTES_PER_CHUNK)
         var chunkIndex = 0
+        var chunkStartMs = 0L
+
+        fun flush() {
+            val data = chunk.toByteArray()
+            if (data.isEmpty()) return
+            val durationMs = (data.size.toLong() * 1000 / BYTES_PER_SECOND).toInt()
+            val name = fileName(recordingId, chunkIndex)
+            File(outputDir, name).writeBytes(data)
+            onChunk(signer.sign(ChunkType.AUDIO, chunkIndex, name, chunkStartMs, durationMs, data))
+            Log.d(TAG, "Signed audio chunk $chunkIndex (${data.size} bytes, $durationMs ms)")
+            chunk.reset()
+            chunkIndex++
+        }
 
         while (isRecording) {
-            val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
-
-            if (bytesRead > 0) {
-                // Add to chunk buffer
-                chunkBuffer.addAll(buffer.take(bytesRead))
-
-                // If chunk is complete, sign and save it
-                if (chunkBuffer.size >= samplesPerChunk) {
-                    val chunkData = chunkBuffer.toByteArray()
-                    val attestation = createChunkAttestation(chunkData, chunkIndex)
-                    chunks.add(attestation)
-
-                    // Save chunk to file
-                    saveChunk(chunkData, chunkIndex)
-
-                    chunkBuffer.clear()
-                    chunkIndex++
-                }
+            val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+            if (read <= 0) continue
+            if (chunk.size() == 0) {
+                // Chunk starts when its first samples arrive; subtract the buffer's own duration.
+                chunkStartMs = System.currentTimeMillis() - read * 1000L / BYTES_PER_SECOND
             }
+            chunk.write(buffer, 0, read)
+            if (chunk.size() >= BYTES_PER_CHUNK) flush()
         }
-
-        // Save remaining data
-        if (chunkBuffer.isNotEmpty()) {
-            val chunkData = chunkBuffer.toByteArray()
-            val attestation = createChunkAttestation(chunkData, chunkIndex)
-            chunks.add(attestation)
-            saveChunk(chunkData, chunkIndex)
-        }
+        flush()
     }
-
-    /**
-     * Create cryptographic attestation for an audio chunk
-     */
-    private fun createChunkAttestation(
-        audioData: ByteArray,
-        chunkIndex: Int
-    ): AudioChunkAttestation {
-        val timestamp = System.currentTimeMillis()
-
-        // Hash the audio data
-        val sha256 = MessageDigest.getInstance("SHA-256")
-        val audioHash = sha256.digest(audioData)
-
-        // Create attestation payload
-        val payload = ByteBuffer.allocate(
-            8 + // timestamp
-            4 + // chunk index
-            32 + // audio hash
-            16   // recording ID (UUID bytes)
-        )
-        payload.putLong(timestamp)
-        payload.putInt(chunkIndex)
-        payload.put(audioHash)
-        payload.put(recordingId.toByteArray().take(16).toByteArray())
-
-        // Sign with hardware key
-        val signatureResult = attestationManager.signData(payload.array())
-
-        val signature = when (signatureResult) {
-            is SignatureResult.Success -> signatureResult.signature
-            is SignatureResult.Error -> {
-                Log.e(TAG, "Failed to sign chunk: ${signatureResult.message}")
-                ByteArray(0)
-            }
-        }
-
-        return AudioChunkAttestation(
-            chunkIndex = chunkIndex,
-            timestamp = timestamp,
-            audioHash = audioHash,
-            signature = signature,
-            audioDataSize = audioData.size
-        )
-    }
-
-    /**
-     * Save audio chunk to file
-     */
-    private fun saveChunk(audioData: ByteArray, chunkIndex: Int) {
-        try {
-            val chunkFile = File(outputDir, "${recordingId}_chunk_${chunkIndex}.pcm")
-            FileOutputStream(chunkFile).use { it.write(audioData) }
-            Log.d(TAG, "Saved chunk $chunkIndex: ${audioData.size} bytes")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save chunk $chunkIndex", e)
-        }
-    }
-
-    /**
-     * Export recording manifest with all attestations
-     */
-    fun exportManifest(manifest: RecordingManifest): String {
-        val json = JSONObject()
-        json.put("recording_id", manifest.recordingId)
-        json.put("timestamp", manifest.timestamp)
-        json.put("attestation_chain", attestationManager.exportAttestationChain())
-
-        val chunksArray = JSONArray()
-        manifest.chunks.forEach { chunk ->
-            val chunkJson = JSONObject()
-            chunkJson.put("index", chunk.chunkIndex)
-            chunkJson.put("timestamp", chunk.timestamp)
-            chunkJson.put("audio_hash", Base64.encodeToString(chunk.audioHash, Base64.NO_WRAP))
-            chunkJson.put("signature", Base64.encodeToString(chunk.signature, Base64.NO_WRAP))
-            chunkJson.put("size", chunk.audioDataSize)
-            chunksArray.put(chunkJson)
-        }
-        json.put("chunks", chunksArray)
-
-        return json.toString(2)
-    }
-}
-
-data class AudioChunkAttestation(
-    val chunkIndex: Int,
-    val timestamp: Long,
-    val audioHash: ByteArray,
-    val signature: ByteArray,
-    val audioDataSize: Int
-)
-
-data class RecordingManifest(
-    val recordingId: String,
-    val chunks: List<AudioChunkAttestation>,
-    val attestationInfo: String,
-    val timestamp: Long
-)
-
-sealed class RecordingResult {
-    data class Success(val message: String) : RecordingResult()
-    data class Error(val message: String) : RecordingResult()
 }

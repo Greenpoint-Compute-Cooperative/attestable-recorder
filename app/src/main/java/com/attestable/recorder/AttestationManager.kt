@@ -5,6 +5,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.security.*
 import java.security.cert.Certificate
 import java.security.cert.X509Certificate
@@ -14,13 +15,25 @@ import java.security.spec.ECGenParameterSpec
  * Manages hardware-backed key attestation on GrapheneOS
  * Uses Android Keystore + Titan M2 for cryptographic proof
  */
-class AttestationManager {
+class AttestationManager(private val stateDir: File? = null) {
     companion object {
         private const val TAG = "AttestationManager"
         private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
         private const val KEY_ALIAS = "attestable_recorder_key"
         private const val SIGNATURE_ALGORITHM = "SHA256withECDSA"
+        private const val CHALLENGE_FILE = "attestation_challenge.b64"
     }
+
+    /**
+     * The challenge that was fed into key generation. The verifier (Warden) checks that the
+     * attestation record embeds exactly this value, so it must travel with the manifest.
+     * Persisted next to the app's private files so it survives process restarts.
+     */
+    private var attestationChallenge: ByteArray? = loadChallenge()
+
+    /** "verifier" if the challenge came from outside (typed/injected), "app" if self-generated. */
+    var challengeSource: String? = loadChallengeSource()
+        private set
 
     private val keyStore: KeyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply {
         load(null)
@@ -30,7 +43,7 @@ class AttestationManager {
      * Generate a hardware-backed EC key pair with attestation
      * This key will be stored in Titan M2 and cannot be extracted
      */
-    fun generateAttestationKey(challenge: ByteArray): AttestationResult {
+    fun generateAttestationKey(challenge: ByteArray, source: String = "app"): AttestationResult {
         try {
             // Delete existing key if present
             if (keyStore.containsAlias(KEY_ALIAS)) {
@@ -62,6 +75,9 @@ class AttestationManager {
 
             keyPairGenerator.initialize(parameterSpec)
             val keyPair = keyPairGenerator.generateKeyPair()
+            attestationChallenge = challenge
+            challengeSource = source
+            saveChallenge(challenge, source)
 
             // Get attestation certificate chain
             val certificateChain = keyStore.getCertificateChain(KEY_ALIAS)
@@ -114,8 +130,8 @@ class AttestationManager {
     }
 
     /**
-     * Export attestation certificate chain for verification
-     * This can be sent to a server running Warden for validation
+     * Export attestation certificate chain (leaf first, concatenated DER, base64) for the
+     * Warden-based verifier in server/
      */
     fun exportAttestationChain(): String {
         val certificateChain = keyStore.getCertificateChain(KEY_ALIAS) ?: return ""
@@ -126,6 +142,36 @@ class AttestationManager {
         }
 
         return Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+    }
+
+    /**
+     * Base64 challenge used when the current attestation key was generated, or null if unknown.
+     */
+    fun exportAttestationChallenge(): String? =
+        attestationChallenge?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
+
+    private fun challengeFile(): File? = stateDir?.let { File(it, CHALLENGE_FILE) }
+
+    // File format: line 1 = base64 challenge, line 2 = source ("app" | "verifier")
+    private fun saveChallenge(challenge: ByteArray, source: String) {
+        try {
+            challengeFile()?.writeText(Base64.encodeToString(challenge, Base64.NO_WRAP) + "\n" + source)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not persist attestation challenge", e)
+        }
+    }
+
+    private fun loadChallenge(): ByteArray? = try {
+        challengeFile()?.takeIf { it.exists() }?.let { Base64.decode(it.readLines().first().trim(), Base64.NO_WRAP) }
+    } catch (e: Exception) {
+        Log.w(TAG, "Could not load persisted attestation challenge", e)
+        null
+    }
+
+    private fun loadChallengeSource(): String? = try {
+        challengeFile()?.takeIf { it.exists() }?.readLines()?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
+    } catch (e: Exception) {
+        null
     }
 
     /**

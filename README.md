@@ -1,6 +1,6 @@
 # Attestable Audio Recorder
 
-A cryptographically verifiable audio recording system for GrapheneOS using hardware attestation (Titan M2) and the Warden framework.
+A cryptographically verifiable **audio + video** recorder for GrapheneOS using hardware attestation (Titan M2) and the Warden framework. Every 5-second audio chunk and every video segment is hashed and signed inside the StrongBox; a signed session record seals the chunk list; the verifier proves which device, app and OS produced the bytes.
 
 ## Overview
 
@@ -37,25 +37,48 @@ This system provides **cryptographic proof** that audio was recorded on a specif
 Kotlin Android application that:
 - Generates EC key pair in Android Keystore with hardware attestation
 - Uses Titan M2 security chip to store private key (cannot be extracted)
-- Records audio from microphone
-- Signs 5-second audio chunks with hardware key
-- Exports attestation manifest with certificate chain
+- Records audio from the microphone (PCM, 5-second chunks) and, optionally, video from the camera
+  (H.264 in independent ~5-second MP4 segments, each starting on a key frame)
+- Signs every chunk / segment with the hardware key: `"ATREC"|4|type|recording_id|index|timestamp|duration|sha256|prev_sha256`
+  (hash-chained per stream)
+- Signs a session record over the ordered chunk list and the OS-context digest, so a manifest cannot be
+  truncated, reordered or have its context edited
+- Exports a `manifest_version: 4` JSON with the certificate chain, challenge, context and all chunk records
+- Ships **without the INTERNET permission**: the app provably cannot exfiltrate
+- Release build is **not debuggable** and signed with a dedicated key (`scripts/make-release-keystore.sh`)
 
 **Key Files:**
 - `AttestationManager.kt` - Hardware key generation and attestation
-- `AttestableAudioRecorder.kt` - Audio recording with chunk signing
-- `MainActivity.kt` - UI for recording and exporting
+- `SignedChunk.kt` - Wire format (signed payload, chunk records, session record) shared with the verifier
+- `AttestableAudioRecorder.kt` - PCM capture, chunked and signed
+- `AttestableVideoRecorder.kt` - Camera2 → MediaCodec H.264 → MediaMuxer, cut into signed MP4 segments
+- `RecordingSession.kt` - Runs both streams under one recording id, signs the session record, writes the manifest
+- `MainActivity.kt` - UI: challenge field, video toggle, camera preview, record/export
 
 ### 2. Server Verifier (`server/`)
 
-Kotlin JVM application using Warden to:
-- Verify Android key attestation certificate chains
-- Validate keys are stored in hardware (not software)
-- Verify audio chunk signatures
-- Confirm recording authenticity
+Kotlin JVM application using [Warden](https://github.com/a-sit-plus/warden-supreme)
+(`at.asitplus.warden:makoto`) to:
+- Verify the Android Key Attestation certificate chain up to Google's hardware attestation roots
+  (including Google's certificate revocation list)
+- Parse the attestation extension and enforce a policy on it:
+  - attestation challenge matches the one embedded at key generation
+  - key lives in **StrongBox** (Titan M2), not the TEE or software
+  - package name is `com.attestable.recorder` and the APK signer fingerprint is pinned
+  - bootloader is locked and the verified-boot key is either the vendor key or one of
+    [GrapheneOS's published verified-boot keys](https://grapheneos.org/install/web#verified-boot-key-hash)
+- Verify every audio chunk and video segment signature with the *attested* public key
+- Verify the session record (ordered chunk-list digest) so truncation and reordering are detected
+- Report stream continuity (missing indexes, gaps, audio/video skew) and export playable media
 
 **Key Files:**
-- `Verifier.kt` - Warden-based attestation verification
+- `Verifier.kt` - Warden-based attestation verification + CLI
+- `WardenPolicy.kt` - The policy (package, signer, StrongBox, boot keys) expressed as a Warden configuration
+- `Manifest.kt` - Manifest reader (v1–v3) and the signed-payload format
+- `ChunkVerifier.kt` - Chunk hashes, chunk signatures, session record, continuity checks
+- `Export.kt` - WAV / MP4 export of verified media (uses ffmpeg when available)
+- `ChallengeStore.kt` - Verifier-issued, single-use challenges
+- `src/test/.../WardenGrapheneOsTest.kt` - Tests against a real GrapheneOS Pixel 7a attestation
 
 ## Security Guarantees
 
@@ -71,27 +94,46 @@ When verification succeeds, you have cryptographic proof that:
 
 ### Prerequisites
 
-- GrapheneOS device (tested on Pixel 9 Pro XL)
+- GrapheneOS device (tested on Pixel 10a; any Pixel 6 or newer with Titan M2 should work)
 - Android SDK 28+
 - JDK 17+
-- Gradle
+- Gradle 8.14 (wrapper included; Kotlin 2.4 and AGP 8.13 are pulled in automatically)
 
 ### Build Android App
 
+Use the **release** build for anything you intend to verify. The debug build is debuggable and
+signed with the well-known Android debug key; the verifier will pin whatever signer you give it,
+but pinning the debug key proves nothing.
+
 ```bash
 cd attestable-recorder
-./gradlew :app:assembleDebug
+./scripts/make-release-keystore.sh      # once; writes release.jks + keystore.properties (gitignored) and prints the signer SHA-256
+./gradlew :app:assembleRelease
+adb install app/build/outputs/apk/release/app-release.apk
 ```
 
-Install on phone:
-```bash
-adb install app/build/outputs/apk/debug/app-debug.apk
-```
+For quick development only: `./gradlew :app:assembleDebug` and install `app-debug.apk`.
+
+**Reproducible:** `./gradlew :app:assembleRelease -PunsignedRelease` yields `app-release-unsigned.apk`,
+which is byte-for-byte reproducible from the sources (pinned toolchain in `Dockerfile`). See
+`REPRODUCIBLE_BUILD.md` for how to check a published release against your own build.
+Releases: https://github.com/Greenpoint-Compute-Cooperative/attestable-recorder/releases
 
 ### Build Server Verifier
 
 ```bash
-./gradlew :server:build
+./gradlew :server:test        # runs the Warden integration tests
+./gradlew :server:installDist # creates server/build/install/attestable-verifier/bin/attestable-verifier
+./gradlew :server:distZip     # server/build/distributions/attestable-verifier-1.0.0.zip (published with each release)
+```
+
+### Get the APK signer fingerprint
+
+Warden pins the APK signing certificate, so the verifier needs its SHA-256:
+
+```bash
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs app/build/outputs/apk/debug/app-debug.apk
+# Signer #1 certificate SHA-256 digest: 791f6c6f8303584eed777bf3b8c13664fb519e02eb96adc481c7ad8d791e7641
 ```
 
 ## Usage
@@ -103,10 +145,11 @@ adb install app/build/outputs/apk/debug/app-debug.apk
    - Tap "Generate Attestation Key"
    - Key is created in Titan M2 with attestation certificate
 
-2. **Record Audio**
-   - Tap "Start Recording"
-   - Audio is captured in 5-second chunks
-   - Each chunk is signed with hardware key
+2. **Record**
+   - Leave "Record video" checked for audio + video, or untick it for audio only
+   - Tap "Start Recording"; the camera preview shows what is being signed
+   - Audio is captured in 5-second PCM chunks; video in ~5-second MP4 segments
+   - Each chunk / segment is hashed and signed in the Titan M2 as soon as it is complete
 
 3. **Stop & Export**
    - Tap "Stop Recording"
@@ -115,28 +158,63 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 ### Verification on Server
 
-Transfer manifest + audio chunks to server, then verify:
+Optional but recommended, before recording: issue a challenge so freshness can be proven.
 
 ```bash
-./gradlew :server:run --args="path/to/manifest.json path/to/chunks_dir/"
+server/build/install/attestable-verifier/bin/attestable-verifier issue-challenge --ttl 30
+# prints a base64 challenge + an `adb shell am start ... --es challenge ...` one-liner
 ```
 
-Example output:
+Enter the challenge in the app's text field (or run the printed adb command), then tap
+"Generate Attestation Key". Transfer manifest + audio chunks to server, then verify:
+
+```bash
+./gradlew :server:run --args="path/to/manifest.json path/to/chunks_dir/ --signer <apk-sha256> --require-issued-challenge"
+# or
+server/build/install/attestable-verifier/bin/attestable-verifier path/to/manifest.json path/to/chunks_dir/ --signer <apk-sha256>
 ```
-🔍 Verifying recording manifest: abc123_manifest.json
-📋 Recording ID: abc123
-📦 Chunks: 10
 
-⚙️  Verifying Android key attestation with Warden...
-✅ Attestation verified:
-   - Hardware-backed: true
-   - Package: com.attestable.recorder
-   - Security level: STRONG_BOX
+Options:
 
-🎵 Verifying audio chunk signatures...
-   ✅ Chunk 0: Valid (441000 bytes)
-   ✅ Chunk 1: Valid (441000 bytes)
+| Flag | Meaning |
+|------|---------|
+| `--signer <hex>` | SHA-256 of the APK signing certificate (required, repeatable) |
+| `--package <name>` | Expected package name (default `com.attestable.recorder`) |
+| `--challenge <base64>` | Override the challenge to check (defaults to the one stored in the manifest) |
+| `--require-issued-challenge` | Fail unless the manifest's challenge was issued by this verifier's store |
+| `--challenge-store <dir>` | Where issued challenges live (default `./challenges`) |
+| `--allow-tee` | Accept TEE keys (default: StrongBox required) |
+| `--allow-unlocked-bootloader` | **Demo only.** Disables bootloader-lock and verified-boot checks |
+| `--verified-boot-key <hex>` | Trust an extra self-signed verified-boot key |
+| `--skip-revocation-check` | Don't fetch Google's revocation list (offline) |
+| `--export <dir>` | After success, write `<id>.wav`, a video concat list, and (with ffmpeg) `<id>_video.mp4` + `<id>_combined.mp4` |
+| `--inspect <manifest>` | Just print what the attestation record contains, no policy |
+
+Example output (Pixel 10a, GrapheneOS):
+```
+⚙️  Verifying Android key attestation with Warden
+   Policy: package=com.attestable.recorder, strongBox=true, unlockedBootloaderAllowed=false, revocationCheck=true
+✅ Attestation verified
+   Attestation security level: STRONGBOX
+   Key security level:         STRONGBOX
+   Challenge: fhSl1bDLwSmgRXZhurmNTksB3CqbaB766+YXerD+HVg=
+   App: com.attestable.recorder (versionCode 1)
+   APK signer SHA-256: 791f6c6f8303584eed777bf3b8c13664fb519e02eb96adc481c7ad8d791e7641
+   Bootloader locked: true
+   Verified boot state: SelfSigned
+   Verified boot key: d8f879d10419eddc9fcda6280718be763f6bf12299e1f72df3ea8ad8a8eb7f80 (GrapheneOS Pixel 10a)
+   OS version: 17.0.0
+   OS patch level: 2026-09
+   Key origin: GENERATED
+
+🎬 Verifying chunks with the attested key...
+   ✅ video 0: valid ( 4662 ms, 2326995 bytes)
+   ✅ audio 0: valid ( 5050 ms, 445440 bytes)
+   ✅ video 1: valid ( 4654 ms, 2314543 bytes)
    ...
+   ✅ session record: signed chunk list matches (11 chunks, no truncation or reordering)
+
+📊 Verification complete: 5/5 audio, 6/6 video chunks valid
 
 ✅ VERIFICATION SUCCESSFUL
    Recording ID: abc123
@@ -207,14 +285,16 @@ val signature = sign_with_hardware_key(payload)
 ### 3. Verification
 
 Server uses Warden to:
-1. Verify certificate chain up to Google root CA
-2. Check hardware backing (StrongBox = Titan M2)
-3. Validate app identity
-4. Verify each chunk signature against public key
+1. Verify certificate chain up to Google's hardware attestation root CA (+ revocation list)
+2. Parse the attestation extension and check challenge, StrongBox, package name, APK signer,
+   bootloader lock state and verified-boot key
+3. Return the attested public key
+4. Verify each audio chunk and video segment against that attested key, then the session record
+5. Optionally export the verified media (`--export`) for playback
 
 ## Resources
 
-- [Warden](https://github.com/amiller/warden) - Android/iOS key attestation library
+- [Warden Supreme](https://github.com/a-sit-plus/warden-supreme) - Android/iOS key attestation library by A-SIT Plus (Maven: `at.asitplus.warden:makoto`)
 - [TEE Interop](https://teleport-computer.github.io/tee-interop/) - Decentralized TEE network
 - [Android Key Attestation](https://developer.android.com/privacy-and-security/security-key-attestation)
 - [GrapheneOS](https://grapheneos.org/)
@@ -225,11 +305,12 @@ MIT
 
 ## Security Considerations
 
-- **Bootloader**: GrapheneOS allows bootloader unlock. Warden verifier currently accepts this. For maximum security, relock bootloader after installation.
-- **App Signature**: Current implementation doesn't verify app signature. For production, pin expected app signing certificate.
-- **Root Detection**: Add root/integrity checks if needed
+- **Bootloader**: The verifier **rejects** unlocked bootloaders by default (Warden checks the root-of-trust in the attestation record). GrapheneOS's own verified-boot keys are trusted, so a relocked GrapheneOS device passes. `--allow-unlocked-bootloader` exists for demos only and disables all boot checks.
+- **App Signature**: The APK signing certificate is pinned via `--signer`. Use the release build and its key. Even then, the signer proves *who holds the key*, not *what code ran* (an evil-twin APK with the same key passes); the intended fix is an encumbered TEE/HSM key that only signs reproducible builds. See `REVIEW_RESPONSE.md`.
+- **Timestamps**: chunk timestamps come from the phone clock and are treated as ordering evidence. The verifier bounds them below by the challenge issue time and above by its own clock.
+- **Challenge Freshness**: Warden proves the key was created with a given challenge; freshness needs the *verifier* to choose it. `server issue-challenge` prints a single-use, time-limited challenge and remembers it; enter it in the app (or inject it with the printed `adb ... --es challenge` command) before generating the key. On verification the challenge is looked up, its issue time is reported as a lower bound on key generation, and it is consumed so it cannot validate a second recording. Use `--require-issued-challenge` to reject recordings whose challenge the verifier did not issue. Self-generated challenges (manifest `challenge_source: "app"`) still verify but are reported as "freshness not proven".
 - **Replay Protection**: Verify timestamps are recent
-- **Challenge Freshness**: Use server-provided challenges for key generation
+- **Root Detection**: Not needed beyond attestation: a rooted/modified OS shows up as an unlocked bootloader or an unknown verified-boot key.
 
 ## Future Enhancements
 

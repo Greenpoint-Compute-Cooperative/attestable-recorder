@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credible Sensors Roadmap × Pixel — Evaluation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1f4037 0%, #2c5364 50%, #0f2027 100%);
+            overflow: hidden;
+        }
+
+        .slideshow { width: 100vw; height: 100vh; position: relative; }
+
+        .slide {
+            position: absolute; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 0.5s ease-in-out;
+            padding: 3rem; color: white;
+            pointer-events: none;
+        }
+        .slide.active { opacity: 1; pointer-events: auto; }
+
+        h1 { font-size: 3.5rem; margin-bottom: 1.5rem; text-align: center; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+        h2 { font-size: 2.6rem; margin-bottom: 1.5rem; text-align: center; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+        h3 { font-size: 1.4rem; margin-bottom: 0.8rem; }
+
+        .content {
+            max-width: 1360px; width: 100%; max-height: 88vh; overflow-y: auto;
+            background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(10px);
+            border-radius: 20px; padding: 2.5rem; border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .big-text { font-size: 1.8rem; line-height: 1.6; text-align: center; }
+        .sub { font-size: 1.15rem; line-height: 1.6; opacity: 0.9; }
+
+        .flow-diagram { display: flex; align-items: center; justify-content: center; margin: 1.5rem 0; flex-wrap: wrap; }
+        .flow-box {
+            background: rgba(255, 255, 255, 0.12); padding: 1rem 1.2rem; border-radius: 12px; margin: 0.5rem;
+            min-width: 160px; text-align: center; border: 2px solid rgba(255, 255, 255, 0.3); font-size: 1.05rem;
+        }
+        .flow-box small { display: block; opacity: 0.75; font-size: 0.85rem; margin-top: 0.3rem; }
+        .flow-arrow { font-size: 2rem; margin: 0 0.5rem; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem; margin: 1.5rem 0; }
+        .card { background: rgba(255, 255, 255, 0.1); padding: 1.5rem; border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .card.good { border-color: rgba(144, 238, 144, 0.7); background: rgba(144, 238, 144, 0.12); }
+        .card.bad { border-color: rgba(255, 99, 71, 0.7); background: rgba(255, 99, 71, 0.12); }
+        .card.warn { border-color: rgba(255, 179, 71, 0.8); background: rgba(255, 179, 71, 0.12); }
+
+        ul.plain { list-style: none; font-size: 1.15rem; line-height: 1.9; }
+        ul.plain li { padding-left: 0.2rem; }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.55); padding: 1.2rem; border-radius: 10px;
+            font-family: 'SF Mono', 'Courier New', monospace; font-size: 1rem; line-height: 1.5;
+            margin: 1rem 0; text-align: left; overflow-x: auto; white-space: pre;
+        }
+        .code-block .ok { color: #90ee90; }
+        .code-block .no { color: #ff7f7f; }
+        .code-block .dim { opacity: 0.6; }
+
+        .highlight { color: #ffd700; font-weight: bold; }
+        .chip {
+            display: inline-block; background: rgba(255, 215, 0, 0.25); padding: 0.3rem 0.8rem;
+            border-radius: 20px; border: 1px solid #ffd700; margin: 0.2rem; font-size: 0.95rem;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 1.05rem; margin-top: 1rem; }
+        th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.2); vertical-align: top; }
+        th { background: rgba(255,255,255,0.12); }
+        td.cost-low { color: #ff7f7f; font-weight: bold; }
+        td.cost-mid { color: #ffb347; font-weight: bold; }
+        td.cost-high { color: #90ee90; font-weight: bold; }
+
+        .controls { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); display: flex; gap: 1rem; z-index: 1000; }
+        button {
+            background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 0.8rem 1.6rem;
+            font-size: 1.1rem; border-radius: 50px; cursor: pointer; transition: all 0.3s ease; backdrop-filter: blur(10px);
+        }
+        button:hover { background: rgba(255, 255, 255, 0.3); transform: scale(1.05); }
+        .slide-counter {
+            position: fixed; top: 1.5rem; right: 1.5rem; font-size: 1.2rem; color: white;
+            background: rgba(0, 0, 0, 0.3); padding: 0.7rem 1.2rem; border-radius: 50px; backdrop-filter: blur(10px); z-index: 1000;
+        }
+        .emoji-big { font-size: 4rem; margin-bottom: 1rem; text-align: center; }
+        .center { text-align: center; }
+    
+        .kpi { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.2rem 0; }
+        .kpi .card { text-align: center; padding: 1.1rem; }
+        .kpi .num { font-size: 2.6rem; font-weight: 700; color: #ffd700; }
+        .kpi .lbl { font-size: 0.95rem; opacity: 0.85; }
+        .bar { height: 14px; border-radius: 7px; background: rgba(255,255,255,0.15); overflow: hidden; margin-top: 0.4rem; }
+        .bar > div { height: 100%; background: linear-gradient(90deg, #90ee90, #00c2a8); }
+        td.ok { color: #90ee90; } td.warn { color: #ffb347; } td.bad { color: #ff7f7f; }
+        .small { font-size: 0.95rem; opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+<div class="slideshow">
+
+    <!-- 1 -->
+    <div class="slide active">
+        <div class="content">
+            <div class="emoji-big">🗺️</div>
+            <h1>Credible Sensors Roadmap × Pixel</h1>
+            <p class="big-text">How much of "verifiable audio + video capture" is already done, what a Pixel makes cheaper, and where it plugs into vibecode-room</p>
+            <p class="big-text" style="margin-top: 1.5rem; font-size: 1.2rem; opacity: 0.85;">
+                Evaluated against the July 15 roadmap export + live GitHub issues #3–#87 · Greenpoint Compute Cooperative · Sep 12, 2026
+            </p>
+        </div>
+    </div>
+
+    <!-- 2 What we're evaluating against -->
+    <div class="slide">
+        <div class="content">
+            <h2>The Roadmap in One Screen</h2>
+            <div class="kpi">
+                <div class="card"><div class="num">12</div><div class="lbl">epics</div></div>
+                <div class="card"><div class="num">73</div><div class="lbl">tasks</div></div>
+                <div class="card"><div class="num">666h</div><div class="lbl">estimated</div></div>
+                <div class="card"><div class="num">Oct</div><div class="lbl">demo day</div></div>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Track A · Verifiable capture (226 h)</h3>
+                    <ul class="plain">
+                        <li>A1 Transcriber on a stock phone (VoxTerm fork) · 62–76 h</li>
+                        <li>A2 Hardened OS (GrapheneOS, custom keys, kiosk) · 54 h</li>
+                        <li>A3 Minimal open device (MCU + secure element) · 56 h</li>
+                        <li>A4 Video camera (Pi 5 + C2PA) · 34 h</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Tracks B, C, PGM (440 h)</h3>
+                    <ul class="plain">
+                        <li>B1–B3 Tamper-evident enclosure + recording indicator · 198 h</li>
+                        <li>C1–C3 Vibe code room: single, multiplayer, consent layer · 172 h</li>
+                        <li>C4 <strong>Credible vibe code room</strong> (October demo) · 46 h</li>
+                        <li>PGM Program &amp; demo · 30 h</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="sub center small">Caveat: today's attachment is StatiCrypt-encrypted (no passphrase available). If the roadmap was re-scoped after July, re-read this against the new version.</p>
+        </div>
+    </div>
+
+    <!-- 3 What exists today -->
+    <div class="slide">
+        <div class="content">
+            <h2>What Already Runs on the Pixel 10a</h2>
+            <div class="grid-3">
+                <div class="card good">
+                    <h3>📱 Capture app</h3>
+                    <p class="sub">GrapheneOS, bootloader locked. Audio in 5-second chunks, each hashed and signed inside the Titan M2 (StrongBox). Accepts a verifier-issued challenge (text field or adb intent).</p>
+                </div>
+                <div class="card good">
+                    <h3>🛡️ Warden verifier</h3>
+                    <p class="sub">Chain to Google root + revocation list; challenge, StrongBox, package, APK signer, bootloader lock, GrapheneOS verified-boot key. Chunks checked with the <em>attested</em> key.</p>
+                </div>
+                <div class="card good">
+                    <h3>🕐 Freshness</h3>
+                    <p class="sub">Single-use, time-limited challenges issued by the verifier; consumed on success. Proven end to end today: strict policy pass, second use rejected.</p>
+                </div>
+            </div>
+            <div class="code-block">✅ Attestation verified   STRONGBOX · com.attestable.recorder · signer 791f6c6f… · bootloader locked
+   Verified boot: SelfSigned, key d8f879d1… (GrapheneOS Pixel 10a) · OS 17, patch 2026-09
+   Freshness: key generated after 19:32:53Z (verifier-issued challenge, now consumed) · 3/3 chunks valid</div>
+            <p class="sub center">Plus: 11 unit tests (incl. a real GrapheneOS Pixel 7a attestation from Warden's suite), honest assessment, two trust-model decks.</p>
+        </div>
+    </div>
+
+    <!-- 4 Headline -->
+    <div class="slide">
+        <div class="content">
+            <h2>Headline Numbers</h2>
+            <div class="grid-2">
+                <div class="card good">
+                    <h3>≈ 45% of Track A is done or made materially cheaper</h3>
+                    <p class="sub">≈ 100 of 226 h. A1's attestation binding is exceeded, A2's image-match script is mostly done, A4's signing camera and segment verifier are built.</p>
+                    <div class="bar"><div style="width:45%"></div></div>
+                </div>
+                <div class="card good">
+                    <h3>C4's integration seam (#76) is concrete</h3>
+                    <p class="sub">Attested phone mic → the room's existing <code>/api/mic</code> PCM socket + an attestation sidecar. ~22 h, inside C4's 46 h budget.</p>
+                    <div class="bar"><div style="width:48%"></div></div>
+                </div>
+                <div class="card bad">
+                    <h3>Track B and A3: 0% from a phone</h3>
+                    <p class="sub">Enclosures, hardware recording indicator, open MCU device are physical work. The Pixel is the <em>comparison baseline</em> A3's verdict memo asks for.</p>
+                    <div class="bar"><div style="width:0%"></div></div>
+                </div>
+                <div class="card warn">
+                    <h3>One real technical gap</h3>
+                    <p class="sub">A1 #19 wants a static, backend-free bystander verifier. Warden is JVM-only, so this needs an Android verifier app or a LAN service.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5 Track A table -->
+    <div class="slide">
+        <div class="content">
+            <h2>Track A, Epic by Epic</h2>
+            <table>
+                <tr><th>Epic</th><th>Roadmap</th><th>Pixel + Warden status</th><th>Left on Pixel</th></tr>
+                <tr><td><strong>A1</strong> Transcriber on a stock phone</td><td>62–76 h</td><td class="ok">Attestation core (#18) done and beyond spec; write-up (#21) ~80%; QR verifier (#19) needs a non-JVM path</td><td>~30 h</td></tr>
+                <tr><td><strong>A2</strong> Hardened OS</td><td>54 h</td><td class="ok">Verification half done: locked bootloader, boot-key pinning, patch levels extracted. Custom-key OS build + kiosk not started</td><td>~35 h</td></tr>
+                <tr><td><strong>A3</strong> Minimal open device</td><td>56 h</td><td class="warn">Different hardware. Pixel results feed the "open device vs stock phone" verdict (#32)</td><td>0 h (memo)</td></tr>
+                <tr><td><strong>A4</strong> Video camera</td><td>34 h</td><td class="ok">Signing camera <strong>built</strong>: Camera2 → H.264 → signed MP4 segments + session record, verified and tamper-tested by the same verifier. Pixel beats the Pi 5 on the injected-feed problem</td><td>~10 h (threat write-up, optional C2PA wrap)</td></tr>
+            </table>
+            <p class="sub center small">Hours are remaining effort on the Pixel path; roadmap hours are the original estimates.</p>
+        </div>
+    </div>
+
+    <!-- 6 A1 tasks -->
+    <div class="slide">
+        <div class="content">
+            <h2>A1 — Transcriber on a Stock Phone, Task by Task</h2>
+            <table>
+                <tr><th>Task</th><th>h</th><th>Status</th><th>Note</th></tr>
+                <tr><td>#15 Validate VoxTerm ASR</td><td>4</td><td class="warn">not started</td><td>Orthogonal to attestation; sherpa-onnx Whisper runs on this phone unchanged</td></tr>
+                <tr><td>#16 Fork VoxTerm, strip to scope</td><td>8</td><td class="warn">decision</td><td>VoxTerm (Tauri + Kotlin plugin) vs this Kotlin app. Our attestation + signing + challenge code is ~600 lines and drops into either. No-INTERNET manifest is trivial here (no network code)</td></tr>
+                <tr><td>#17 On-device PII/name redaction</td><td>14</td><td class="warn">not started</td><td>Pure NLP; unaffected</td></tr>
+                <tr><td><strong>#18 Bind proof via key attestation</strong></td><td>12</td><td class="ok">done, exceeds spec</td><td>Spec: sign transcript hash, verify chain offline. Have: per-chunk StrongBox signatures, full Warden policy, fresh challenges. Add the redacted-transcript hash to the signed payload: ~2 h</td></tr>
+                <tr><td>#19 QR verify + bystander verifier</td><td>12</td><td class="bad">blocked as specified</td><td>"Static page, no backend" needs a JS verifier; Warden is JVM. Do: Android verifier app (Warden roboto spike) + LAN page. ~14 h</td></tr>
+                <tr><td>#20 Layperson test</td><td>6</td><td class="warn">needs #19</td><td></td></tr>
+                <tr><td>#21 What attestation does/doesn't cover</td><td>6</td><td class="ok">~80%</td><td>HONEST_ASSESSMENT.md + trust-model deck; add no-INTERNET framing + layperson findings</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- 7 A2 -->
+    <div class="slide">
+        <div class="content">
+            <h2>A2 — Hardened OS: Verification Is Ready, the Build Isn't</h2>
+            <div class="grid-2">
+                <div class="card good">
+                    <h3>Done or nearly</h3>
+                    <ul class="plain">
+                        <li>#22 Procure Pixel — Pixel 10a in hand; all 21 GrapheneOS boot keys pinned</li>
+                        <li>#25 Image-match + attestation script — verifier already extracts verified-boot state, boot key, boot hash, OS/vendor/boot patch levels. Remaining: compare boot hash to the built image (~3 h once #23 exists)</li>
+                    </ul>
+                </div>
+                <div class="card warn">
+                    <h3>Not started</h3>
+                    <ul class="plain">
+                        <li>#23 Reproducible GrapheneOS build with custom keys (22 h) — the verifier is ready for it: <code>--verified-boot-key &lt;digest&gt;</code> and drop OEM/GrapheneOS keys → attestation proves "booted <em>our</em> image"</li>
+                        <li>#24 Kiosk lock (10 h) — device-owner mode, orthogonal</li>
+                        <li>#26 Update-key threat memo (6 h)</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="sub center">Key point: custom keys make the boot-key check the strongest claim in the stack — and it is a one-flag change on the verifier.</p>
+        </div>
+    </div>
+
+    <!-- 8 A4 video -->
+    <div class="slide">
+        <div class="content">
+            <h2>A4 — Video: the Pixel Is a Better Base Than the Pi</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Roadmap plan</h3>
+                    <p class="sub">Raspberry Pi 5 + Camera Module 3, c2pa-rs per-segment signing. Named gap: a $30 TC358743 HDMI→CSI-2 adapter injects synthetic video and the Pi signs a valid C2PA manifest for it. "Named, not closed."</p>
+                </div>
+                <div class="card good">
+                    <h3>On the Pixel</h3>
+                    <p class="sub">Sensor → ISP over an internal MIPI link on the board; no exposed CSI connector. Injection needs a modified OS (caught by verified boot) or physical rework. Not closed, but the cost rises from "buy an adapter" to "desolder a phone".</p>
+                </div>
+            </div>
+            <div class="code-block">CameraX → MediaCodec H.264 → fMP4 segments (2–5 s) → SHA-256 → sign in StrongBox → manifest
+same verifier, one new chunk type · C2PA wrapper as a post-process (c2patool) if the wire format matters</div>
+            <table>
+                <tr><th>Task</th><th>Roadmap</th><th>Pixel</th></tr>
+                <tr><td>#33 Procure Pi + camera + adapter</td><td>3 h + $150</td><td class="ok">0 h, $0</td></tr>
+                <tr><td>#34 Signing granularity decision</td><td>8 h</td><td class="ok">2 h (segment, reuse audio design)</td></tr>
+                <tr><td>#35 Signing-camera prototype</td><td>12 h</td><td class="ok">done — <code>AttestableVideoRecorder.kt</code></td></tr>
+                <tr><td>#36 Frame-provenance verifier</td><td>5 h</td><td class="ok">done — <code>ChunkVerifier.kt</code>, tamper / truncation / reorder tests</td></tr>
+                <tr><td>#37 Injection threat write-up</td><td>6 h</td><td class="ok">6 h, stronger conclusion</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- 9 vibecode-room today -->
+    <div class="slide">
+        <div class="content">
+            <h2>Target: What vibecode-room Has Today</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Capture path (<code>src/server/index.ts</code>, <code>public/mic.html</code>)</h3>
+                    <ul class="plain">
+                        <li>• Room mic = WebSocket <code>/api/mic</code></li>
+                        <li>• 16 kHz mono little-endian Int16 PCM, 4096-sample frames</li>
+                        <li>• Server replies <code>{type:"ready", sessionId}</code>; refuses while muted (1008)</li>
+                        <li>• Any phone can be <em>the</em> room mic via <code>mic.html</code></li>
+                        <li>• Server does not distinguish sources</li>
+                    </ul>
+                </div>
+                <div class="card warn">
+                    <h3>Gaps relevant to C4 (<code>docs/CURRENT-STATE.md</code>)</h3>
+                    <ul class="plain">
+                        <li>• ASR is cloud (Deepgram) or replay — conflicts with "pull the WAN cable" (C1 #58/#59, not ours)</li>
+                        <li>• No provenance / attestation / per-source identity in <code>src/types.ts</code> or the UI</li>
+                        <li>• Closest hook: <code>onDevice</code>/<code>onSwitch</code> in <code>src/ui/mic.ts</code> — the wall already wants to "say which physical mic is feeding the room instead of leaving it to faith"</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="sub center">That last sentence is the product hook: an attested source is the strongest possible answer to it.</p>
+        </div>
+    </div>
+
+    <!-- 10 The seam -->
+    <div class="slide">
+        <div class="content">
+            <h2>The Seam: C4 #76 on the Pixel</h2>
+            <p class="sub center" style="margin-bottom:0.8rem;">C4's contract: "credible mic presents as a standard audio device or LAN stream, with its attestation log exposed as a separate feed the room UI can display."</p>
+            <div class="flow-diagram">
+                <div class="flow-box">📱 Pixel app<small>records, signs chunks in StrongBox</small></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">🎙️ <code>/api/mic</code><small>same PCM frames as mic.html — room stack unchanged</small></div>
+                <div class="flow-arrow">+</div>
+                <div class="flow-box">🧾 <code>/api/attestation</code><small>sidecar: chain + challenge once, {index, ts, hash, sig} per chunk</small></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">🛡️ Verifier service<small>on the room node; hashes the PCM it received against signed chunks</small></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">🖥️ Wall badge<small>"StrongBox · Pixel 10a · locked · fresh · 47/47 verified"</small></div>
+            </div>
+            <div class="grid-2">
+                <div class="card good">
+                    <h3>Why hash-what-you-received matters</h3>
+                    <p class="sub">It proves the audio the room <em>transcribed</em> is the audio the Titan M2 signed — not merely that some signed audio exists somewhere. It also makes the 100 ms alignment criterion moot: alignment is by content hash, not clock.</p>
+                </div>
+                <div class="card">
+                    <h3>Effort (~22 h, inside C4's 46 h)</h3>
+                    <ul class="plain">
+                        <li>Streaming mode in the app · 8 h</li>
+                        <li>Verifier HTTP service · 6 h</li>
+                        <li>Sidecar ingest + <code>SourceAttestation</code> type + badge · 6 h</li>
+                        <li>LAN end-to-end, WAN unplugged · 2 h</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 11 Generalized tooling -->
+    <div class="slide">
+        <div class="content">
+            <h2>Build It as Generalized Tooling</h2>
+            <p class="sub center" style="margin-bottom:0.8rem;">vibecode-room is one consumer, not the design centre. Three separable pieces:</p>
+            <div class="grid-3">
+                <div class="card">
+                    <h3>1 · <code>attested-capture</code> Android library</h3>
+                    <p class="sub">Extract <code>AttestationManager</code> + chunk signer. Sources: AudioRecord PCM, CameraX fMP4 segments. Sinks: file manifest, live stream. API: <code>openSession(challenge)</code>, <code>sign(chunk)</code>. Optional redacted-transcript binding for A1 #18.</p>
+                </div>
+                <div class="card">
+                    <h3>2 · <code>attested-capture-verifier</code></h3>
+                    <p class="sub">The Warden verifier + HTTP surface + a policy file (package, signers, StrongBox, boot keys, patch level, RKP). JVM jar for room nodes; Android APK for the second-phone bystander path after a spike.</p>
+                </div>
+                <div class="card">
+                    <h3>3 · Wire spec (manifest v3)</h3>
+                    <p class="sub">Session header (chain, challenge + source, device claims) + chunk records (type audio|video, index, ts, hash, sig). Same document as a file, a WebSocket stream, or a C2PA assertion.</p>
+                </div>
+            </div>
+            <p class="sub center"><strong>Order for the October demo:</strong> spec → streaming audio → HTTP verifier → wall badge → video segments → second-phone verifier.</p>
+        </div>
+    </div>
+
+    <!-- 12 What the Pixel doesn't solve -->
+    <div class="slide">
+        <div class="content">
+            <h2>What the Pixel Does Not Solve</h2>
+            <div class="grid-2">
+                <div class="card bad">
+                    <h3>Track B, entirely</h3>
+                    <p class="sub">No tamper-evident enclosure, no hardware recording indicator. The phone's light is software — attested software, but software.</p>
+                </div>
+                <div class="card bad">
+                    <h3>Sensor authenticity</h3>
+                    <p class="sub">Attestation proves which device and app signed the bytes, never that the mic heard a live human or the camera saw a real scene. "Named, not closed" applies unchanged.</p>
+                </div>
+                <div class="card warn">
+                    <h3>Static, backend-free verification (#19)</h3>
+                    <p class="sub">Needs an Android verifier app or a LAN service until attestation verification exists in JS/WASM. Don't write that in-sprint.</p>
+                </div>
+                <div class="card warn">
+                    <h3>App behaviour</h3>
+                    <p class="sub">The release build is signed with a dedicated key, but a signer proves who holds the key, not what ran. Reproducible builds + an encumbered (TEE/HSM) key are still required before a third party can trust the <em>app</em>, not just the chip.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 13 Re-plan -->
+    <div class="slide">
+        <div class="content">
+            <h2>Suggested Re-plan for the Go/No-Go</h2>
+            <table>
+                <tr><th>Item</th><th>Roadmap</th><th>With the Pixel work</th></tr>
+                <tr><td>A1 #18 attestation binding</td><td>12 h</td><td class="ok">2 h — add transcript hash to the signed payload</td></tr>
+                <tr><td>A1 #19 bystander verifier</td><td>12 h</td><td class="warn">14 h — Android verifier app spike + LAN page</td></tr>
+                <tr><td>A1 #21 write-up</td><td>6 h</td><td class="ok">2 h</td></tr>
+                <tr><td>A2 #25 image-match script</td><td>12 h</td><td class="ok">3 h</td></tr>
+                <tr><td>A4 build + verifier (#35, #36)</td><td>17 h + Pi</td><td class="ok">20 h, no Pi</td></tr>
+                <tr><td>A4 threat write-up (#37)</td><td>6 h</td><td class="ok">6 h, stronger conclusion</td></tr>
+                <tr><td>C4 #76 integration</td><td>10 h</td><td class="warn">22 h — the seam is real work; budget it honestly</td></tr>
+            </table>
+            <div class="grid-2" style="margin-top:1rem;">
+                <div class="card good"><h3>Net</h3><p class="sub">Track A remaining drops from ~226 h to ~160 h. C4 integration grows but becomes concrete.</p></div>
+                <div class="card good"><h3>Demo</h3><p class="sub">October can show a <strong>verified-fresh, StrongBox-signed phone channel inside the room</strong> — not a credible mic at a side station.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14 Next -->
+    <div class="slide">
+        <div class="content">
+            <h2>Recommended Next Two Weeks</h2>
+            <div class="grid-2">
+                <div class="card good">
+                    <h3>Week 1</h3>
+                    <ul class="plain">
+                        <li>1. Write manifest v3 wire spec (audio + video chunk records, sidecar framing)</li>
+                        <li>2. Streaming mode in the app → <code>/api/mic</code> + sidecar</li>
+                        <li>3. Verifier HTTP service (challenge, session, chunk-over-received-PCM)</li>
+                        <li>4. Decide VoxTerm-fork vs this-app for A1 #16</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Week 2</h3>
+                    <ul class="plain">
+                        <li>5. vibecode-room: sidecar ingest, <code>SourceAttestation</code>, wall badge</li>
+                        <li>6. LAN end-to-end with WAN unplugged (C4 #77 rehearsal input)</li>
+                        <li>7. ✅ Video segment capture + signing (A4 #35) — done; write the injection threat memo (#37)</li>
+                        <li>8. Warden-roboto-on-Android spike for the second-phone verifier (#19)</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="sub center small" style="margin-top:1rem;">Full write-up: <code>ROADMAP_EVALUATION.md</code> · trust model: <code>warden-trust-model.html</code> · gaps: <code>HONEST_ASSESSMENT.md</code></p>
+        </div>
+    </div>
+
+</div>
+
+<div class="slide-counter"><span id="currentSlide">1</span> / <span id="totalSlides"></span></div>
+<div class="controls">
+    <button id="prevBtn">← Previous</button>
+    <button id="nextBtn">Next →</button>
+</div>
+
+<script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    document.getElementById('totalSlides').textContent = totalSlides;
+
+    function showSlide(n) {
+        slides[currentSlide].classList.remove('active');
+        currentSlide = (n + totalSlides) % totalSlides;
+        slides[currentSlide].classList.add('active');
+        document.getElementById('currentSlide').textContent = currentSlide + 1;
+        slides[currentSlide].querySelector('.content')?.scrollTo(0, 0);
+        history.replaceState(null, '', '#' + (currentSlide + 1));
+    }
+
+    // Deep links: warden-trust-model.html#7 opens slide 7
+    const fromHash = parseInt(location.hash.slice(1), 10);
+    if (fromHash >= 1 && fromHash <= totalSlides) showSlide(fromHash - 1);
+
+    document.getElementById('prevBtn').addEventListener('click', (e) => { e.stopPropagation(); showSlide(currentSlide - 1); });
+    document.getElementById('nextBtn').addEventListener('click', (e) => { e.stopPropagation(); showSlide(currentSlide + 1); });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); showSlide(currentSlide - 1); }
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); showSlide(currentSlide + 1); }
+    });
+
+    // Click right 40% to advance, left 40% to go back (text selection in the middle still works)
+    document.querySelector('.slideshow').addEventListener('click', (e) => {
+        if (e.target.closest('.content')) return;
+        const width = window.innerWidth;
+        if (e.clientX > width * 0.6) showSlide(currentSlide + 1);
+        else if (e.clientX < width * 0.4) showSlide(currentSlide - 1);
+    });
+</script>
+</body>
+</html>
