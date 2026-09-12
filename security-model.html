@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attestable Recorder Security Model</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+
+        .slideshow {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            padding: 4rem;
+            color: white;
+        }
+
+        .slide.active {
+            opacity: 1;
+        }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        h2 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .content {
+            max-width: 1200px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 3rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .big-text {
+            font-size: 2rem;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .flow-box {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin: 1rem;
+            min-width: 200px;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .flow-arrow {
+            font-size: 3rem;
+            margin: 0 1rem;
+        }
+
+        .checklist {
+            list-style: none;
+            font-size: 1.5rem;
+            line-height: 2.5;
+        }
+
+        .checklist li:before {
+            content: "✅ ";
+            margin-right: 1rem;
+        }
+
+        .threat-list {
+            list-style: none;
+            font-size: 1.5rem;
+            line-height: 2.5;
+        }
+
+        .threat-list li.protected:before {
+            content: "🛡️ ";
+            margin-right: 1rem;
+        }
+
+        .threat-list li.vulnerable:before {
+            content: "⚠️ ";
+            margin-right: 1rem;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 1rem;
+            z-index: 1000;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .slide-counter {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            font-size: 1.5rem;
+            color: white;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem 1.5rem;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1.5rem;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+            margin: 1rem 0;
+            text-align: left;
+            overflow-x: auto;
+        }
+
+        .highlight {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .chip {
+            display: inline-block;
+            background: rgba(255, 215, 0, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            border: 2px solid #ffd700;
+            margin: 0.5rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .emoji-big {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="slideshow">
+        <!-- Slide 1: Title -->
+        <div class="slide active">
+            <div class="content">
+                <div class="emoji-big">🔐</div>
+                <h1>Attestable Audio Recorder</h1>
+                <p class="big-text">How Cryptographic Verification Works</p>
+                <p class="big-text" style="margin-top: 2rem; font-size: 1.5rem;">
+                    Using GrapheneOS + Titan M2 Hardware Security
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 2: The Problem -->
+        <div class="slide">
+            <div class="content">
+                <h2>The Problem</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    How do you <span class="highlight">prove</span> that an audio recording:
+                </p>
+                <ul class="checklist">
+                    <li>Came from a specific device?</li>
+                    <li>Hasn't been tampered with?</li>
+                    <li>Was recorded at a certain time?</li>
+                    <li>Is authentic and verifiable?</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 3: The Solution -->
+        <div class="slide">
+            <div class="content">
+                <h2>The Solution</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    <span class="highlight">Hardware-backed cryptographic attestation</span>
+                </p>
+                <div class="flow-diagram">
+                    <div class="flow-box">
+                        <div class="emoji-big">📱</div>
+                        <div>Your Pixel 9 Pro XL</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div class="emoji-big">🔒</div>
+                        <div>Titan M2 Chip</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div class="emoji-big">🎤</div>
+                        <div>Signed Audio</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div class="emoji-big">✅</div>
+                        <div>Verified Proof</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: Titan M2 -->
+        <div class="slide">
+            <div class="content">
+                <h2>What is Titan M2?</h2>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;">🔐 Hardware Security Chip</h3>
+                        <p style="font-size: 1.3rem; line-height: 1.8;">
+                            A separate physical chip on your Pixel that stores cryptographic keys
+                            in a way that <span class="highlight">cannot be extracted</span>, even by root access.
+                        </p>
+                    </div>
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;">🛡️ StrongBox Security</h3>
+                        <p style="font-size: 1.3rem; line-height: 1.8;">
+                            Keys are generated and stored inside the chip.
+                            Private keys <span class="highlight">never leave the hardware</span>.
+                            Only signatures come out.
+                        </p>
+                    </div>
+                </div>
+                <p class="big-text" style="margin-top: 2rem;">
+                    This is the <span class="highlight">trust anchor</span> of the entire system.
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 5: How It Works - Step 1 -->
+        <div class="slide">
+            <div class="content">
+                <h2>Step 1: Key Generation</h2>
+                <div class="code-block">
+// Generate EC key pair in Titan M2
+KeyGenParameterSpec.Builder(KEY_ALIAS, PURPOSE_SIGN)
+    .setIsStrongBoxBacked(true)        // Use Titan M2
+    .setAttestationChallenge(random)   // Include challenge
+    .build()
+                </div>
+                <p class="big-text" style="margin-top: 2rem;">
+                    Result: A <span class="highlight">private key in Titan M2</span> +
+                    <span class="highlight">certificate chain</span> proving it's in hardware
+                </p>
+                <div style="margin-top: 2rem;">
+                    <span class="chip">Private Key (Never Leaves Titan M2)</span>
+                    <span class="chip">Public Key (Shareable)</span>
+                    <span class="chip">5 Certificate Chain</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: Certificate Chain -->
+        <div class="slide">
+            <div class="content">
+                <h2>Certificate Chain</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    The attestation certificate chain proves hardware origin:
+                </p>
+                <div class="flow-diagram" style="flex-direction: column;">
+                    <div class="flow-box" style="width: 80%;">
+                        📜 <strong>Leaf Certificate</strong>: Your app's key (CN=Android Keystore Key)
+                    </div>
+                    <div class="flow-arrow">↓ signed by ↓</div>
+                    <div class="flow-box" style="width: 80%;">
+                        🏭 <strong>StrongBox Certificate</strong>: Titan M2 hardware (O=StrongBox)
+                    </div>
+                    <div class="flow-arrow">↓ signed by ↓</div>
+                    <div class="flow-box" style="width: 80%;">
+                        🔐 <strong>Google Intermediate</strong>: Google Hardware Attestation
+                    </div>
+                    <div class="flow-arrow">↓ signed by ↓</div>
+                    <div class="flow-box" style="width: 80%;">
+                        ⚡ <strong>Google Root CA</strong>: Publicly trusted root
+                    </div>
+                </div>
+                <p class="big-text" style="margin-top: 2rem;">
+                    Each certificate is cryptographically signed by the one above it.
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 7: Recording Process -->
+        <div class="slide">
+            <div class="content">
+                <h2>Step 2: Recording Audio</h2>
+                <div class="flow-diagram" style="flex-direction: column; gap: 1rem;">
+                    <div class="flow-box" style="width: 90%;">
+                        🎤 Record audio from microphone
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 90%;">
+                        ✂️ Split into 5-second chunks
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 90%;">
+                        🔢 Hash each chunk (SHA-256)
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 90%;">
+                        📦 Create payload: timestamp + index + hash + recording_id
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 90%; background: rgba(255, 215, 0, 0.3);">
+                        ✍️ <strong>Sign with Titan M2 key (ECDSA)</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: What Gets Signed -->
+        <div class="slide">
+            <div class="content">
+                <h2>What Gets Signed?</h2>
+                <div class="code-block">
+// For each 5-second audio chunk:
+payload = {
+    timestamp:    1726086005000    (when recorded)
+    chunk_index:  0                (chunk number)
+    audio_hash:   3a4b5c6d...      (SHA-256 of audio)
+    recording_id: uuid              (unique session)
+}
+
+signature = ECDSA_sign(payload, titan_m2_key)
+                </div>
+                <p class="big-text" style="margin-top: 2rem;">
+                    The signature <span class="highlight">cryptographically binds</span>:
+                </p>
+                <ul class="checklist" style="margin-top: 1rem;">
+                    <li>Audio content (via hash)</li>
+                    <li>When it was recorded (timestamp)</li>
+                    <li>Which device (via key in Titan M2)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 9: Verification Process -->
+        <div class="slide">
+            <div class="content">
+                <h2>Step 3: Verification</h2>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;">🔍 Certificate Chain</h3>
+                        <p style="font-size: 1.2rem; line-height: 1.6;">
+                            ✅ Verify each cert is signed by next<br>
+                            ✅ Check dates are valid<br>
+                            ✅ Confirm StrongBox issuer<br>
+                            ✅ Validate up to Google root CA
+                        </p>
+                    </div>
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;">🎵 Audio Signatures</h3>
+                        <p style="font-size: 1.2rem; line-height: 1.6;">
+                            ✅ Hash each audio chunk<br>
+                            ✅ Reconstruct payload<br>
+                            ✅ Verify ECDSA signature<br>
+                            ✅ Check all chunks match
+                        </p>
+                    </div>
+                </div>
+                <p class="big-text" style="margin-top: 2rem; color: #ffd700;">
+                    If verification succeeds → <strong>Cryptographic proof!</strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 10: Your Recording -->
+        <div class="slide">
+            <div class="content">
+                <h2>Your Recording Results</h2>
+                <div class="code-block">
+🔍 Recording ID: 66c6247d-449f-47f0-8b9a-e399e2ce6bda
+📦 Chunks: 2
+
+🔐 Certificate chain: 5 certificates
+✅ Certificate chain verified
+   - Leaf: CN=Android Keystore Key
+   - Issuer: O=StrongBox
+
+🎵 Verifying signatures...
+   ✅ Chunk 0: Valid (445,440 bytes)
+   ✅ Chunk 1: Valid (122,880 bytes)
+
+✅ VERIFICATION SUCCESSFUL
+                </div>
+                <p class="big-text" style="margin-top: 2rem; color: #90EE90;">
+                    All signatures valid! Audio is authentic!
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 11: What This Proves -->
+        <div class="slide">
+            <div class="content">
+                <h2>What This Proves</h2>
+                <ul class="checklist">
+                    <li><strong>Hardware Origin:</strong> Key was created in Titan M2</li>
+                    <li><strong>Device Identity:</strong> Recorded on your Pixel 9 Pro XL</li>
+                    <li><strong>Authenticity:</strong> Each chunk cryptographically signed</li>
+                    <li><strong>Integrity:</strong> Audio hasn't been tampered with</li>
+                    <li><strong>Timeliness:</strong> Timestamps bound to signatures</li>
+                    <li><strong>Non-repudiation:</strong> Can't deny the recording</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 12: Threat Model -->
+        <div class="slide">
+            <div class="content">
+                <h2>Threat Model</h2>
+                <div class="grid-2">
+                    <div class="card" style="border-color: #90EE90;">
+                        <h3 style="margin-bottom: 1rem; color: #90EE90;">🛡️ Protected Against</h3>
+                        <ul class="threat-list">
+                            <li class="protected">Forged recordings</li>
+                            <li class="protected">Tampered audio</li>
+                            <li class="protected">Software-only attacks</li>
+                            <li class="protected">Key extraction</li>
+                            <li class="protected">Replay attacks</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="border-color: #FFB347;">
+                        <h3 style="margin-bottom: 1rem; color: #FFB347;">⚠️ NOT Protected Against</h3>
+                        <ul class="threat-list">
+                            <li class="vulnerable">Physical device compromise</li>
+                            <li class="vulnerable">Evil maid attacks</li>
+                            <li class="vulnerable">Firmware backdoors</li>
+                            <li class="vulnerable">Social engineering</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 13: Security Assumptions -->
+        <div class="slide">
+            <div class="content">
+                <h2>Security Assumptions</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    This system's security relies on:
+                </p>
+                <div class="flow-diagram" style="flex-direction: column;">
+                    <div class="flow-box" style="width: 80%;">
+                        🔒 Titan M2 hardware is trustworthy
+                    </div>
+                    <div class="flow-box" style="width: 80%;">
+                        🏭 Google's attestation root CA is trustworthy
+                    </div>
+                    <div class="flow-box" style="width: 80%;">
+                        🛡️ GrapheneOS maintains security integrity
+                    </div>
+                    <div class="flow-box" style="width: 80%;">
+                        🔐 Private key never leaves Titan M2
+                    </div>
+                    <div class="flow-box" style="width: 80%;">
+                        ✅ ECDSA & SHA-256 remain secure
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 14: Why This Matters -->
+        <div class="slide">
+            <div class="content">
+                <h2>Why This Matters</h2>
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="emoji-big">⚖️</div>
+                        <h3>Legal Evidence</h3>
+                        <p style="font-size: 1.2rem; margin-top: 1rem;">
+                            Court-admissible recordings with hardware-backed proof of authenticity
+                        </p>
+                    </div>
+                    <div class="card">
+                        <div class="emoji-big">📰</div>
+                        <h3>Journalism</h3>
+                        <p style="font-size: 1.2rem; margin-top: 1rem;">
+                            Provably authentic interviews with verifiable source
+                        </p>
+                    </div>
+                    <div class="card">
+                        <div class="emoji-big">🔬</div>
+                        <h3>Research</h3>
+                        <p style="font-size: 1.2rem; margin-top: 1rem;">
+                            Field recordings with chain of custody and device binding
+                        </p>
+                    </div>
+                    <div class="card">
+                        <div class="emoji-big">🔔</div>
+                        <h3>Whistleblowing</h3>
+                        <p style="font-size: 1.2rem; margin-top: 1rem;">
+                            Anonymous but verifiable leaks with hardware attestation
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 15: Beyond Warden -->
+        <div class="slide">
+            <div class="content">
+                <h2>Implementation Details</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    This implementation uses:
+                </p>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;">📱 Android Side</h3>
+                        <ul style="font-size: 1.2rem; line-height: 2; list-style: none;">
+                            <li>• Android Keystore API</li>
+                            <li>• Hardware attestation</li>
+                            <li>• ECDSA signatures</li>
+                            <li>• AudioRecord API</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;">🖥️ Verifier Side</h3>
+                        <ul style="font-size: 1.2rem; line-height: 2; list-style: none;">
+                            <li>• BouncyCastle (crypto)</li>
+                            <li>• X.509 chain validation</li>
+                            <li>• ECDSA verification</li>
+                            <li>• <strike>Warden</strike> (not available)</li>
+                        </ul>
+                    </div>
+                </div>
+                <p style="font-size: 1.3rem; margin-top: 2rem; opacity: 0.8;">
+                    Note: Initially planned to use Warden library for attestation verification,
+                    but implemented directly with BouncyCastle instead.
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 16: Future: TEE Interop -->
+        <div class="slide">
+            <div class="content">
+                <h2>Future: Decentralized Verification</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    <span class="highlight">TEE Interop</span> - No single point of trust
+                </p>
+                <div class="flow-diagram" style="flex-direction: column;">
+                    <div class="flow-box" style="width: 80%;">
+                        📱 Phone generates attestation
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 80%;">
+                        ⛓️ Submit to smart contract
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 80%;">
+                        ✅ Verified on-chain by multiple TEEs
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 80%; background: rgba(255, 215, 0, 0.3);">
+                        🌐 <strong>Public, decentralized verification</strong>
+                    </div>
+                </div>
+                <p style="font-size: 1.3rem; margin-top: 2rem;">
+                    See <span class="highlight">TEE_INTEROP.md</span> for implementation details
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide: The Skeptic's Question -->
+        <div class="slide">
+            <div class="content">
+                <h2>🤔 The Skeptic Asks...</h2>
+                <p class="big-text" style="margin-bottom: 2rem; color: #FFB347;">
+                    "What prevents the app from signing fake chunks?"
+                </p>
+                <div class="flow-diagram" style="flex-direction: column; gap: 1rem;">
+                    <div class="flow-box" style="width: 90%; background: rgba(255, 179, 71, 0.3);">
+                        What if the app generates fake audio and signs it?
+                    </div>
+                    <div class="flow-box" style="width: 90%; background: rgba(255, 179, 71, 0.3);">
+                        How do I know the RIGHT software is running?
+                    </div>
+                    <div class="flow-box" style="width: 90%; background: rgba(255, 179, 71, 0.3);">
+                        Could a malicious app use the same attestation?
+                    </div>
+                </div>
+                <p class="big-text" style="margin-top: 2rem; color: #ffd700;">
+                    These are EXCELLENT questions! Let's address them...
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide: What Attestation Actually Proves -->
+        <div class="slide">
+            <div class="content">
+                <h2>What Attestation Actually Proves</h2>
+                <div class="grid-2">
+                    <div class="card" style="border-color: #90EE90;">
+                        <h3 style="margin-bottom: 1rem; color: #90EE90;">✅ DOES Prove</h3>
+                        <ul style="font-size: 1.2rem; line-height: 2; list-style: none;">
+                            <li>🔐 Key is in Titan M2 hardware</li>
+                            <li>📱 Specific device identity</li>
+                            <li>📦 App package name</li>
+                            <li>🔒 Bootloader state</li>
+                            <li>✍️ Signature is authentic</li>
+                            <li>🔗 Data hasn't been modified</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="border-color: #FFB347;">
+                        <h3 style="margin-bottom: 1rem; color: #FFB347;">❌ Does NOT Prove</h3>
+                        <ul style="font-size: 1.2rem; line-height: 2; list-style: none;">
+                            <li>⚠️ App logic is correct</li>
+                            <li>⚠️ Audio is real vs fake</li>
+                            <li>⚠️ Microphone was used</li>
+                            <li>⚠️ App wasn't compromised</li>
+                            <li>⚠️ Right code is running</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide: The Trust Chain -->
+        <div class="slide">
+            <div class="content">
+                <h2>The Trust Chain</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    Your trust depends on these layers:
+                </p>
+                <div class="flow-diagram" style="flex-direction: column;">
+                    <div class="flow-box" style="width: 85%; background: rgba(144, 238, 144, 0.3);">
+                        <strong>1. Hardware:</strong> Titan M2 is trustworthy ✅
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 85%; background: rgba(144, 238, 144, 0.3);">
+                        <strong>2. OS:</strong> GrapheneOS maintains integrity ✅
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 85%; background: rgba(255, 215, 0, 0.3);">
+                        <strong>3. App Identity:</strong> Package name in attestation ⚠️
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-box" style="width: 85%; background: rgba(255, 179, 71, 0.3);">
+                        <strong>4. App Logic:</strong> Code does what it claims ❌
+                    </div>
+                </div>
+                <p style="font-size: 1.3rem; margin-top: 2rem;">
+                    <strong>Key insight:</strong> Attestation proves identity and authenticity,
+                    but NOT correctness of behavior.
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide: Attack Scenarios -->
+        <div class="slide">
+            <div class="content">
+                <h2>Attack Scenarios</h2>
+                <div class="grid-2">
+                    <div class="card" style="border-color: #90EE90;">
+                        <h3 style="margin-bottom: 1rem; color: #90EE90;">✅ Prevented</h3>
+                        <p style="font-size: 1.2rem; line-height: 1.8;">
+                            <strong>Tampering after recording:</strong><br>
+                            Can't modify audio chunks without breaking signatures.
+                        </p>
+                        <p style="font-size: 1.2rem; line-height: 1.8; margin-top: 1rem;">
+                            <strong>Key extraction:</strong><br>
+                            Private key never leaves Titan M2.
+                        </p>
+                        <p style="font-size: 1.2rem; line-height: 1.8; margin-top: 1rem;">
+                            <strong>Device impersonation:</strong><br>
+                            Each device has unique attestation.
+                        </p>
+                    </div>
+                    <div class="card" style="border-color: #FF6B6B;">
+                        <h3 style="margin-bottom: 1rem; color: #FF6B6B;">❌ NOT Prevented</h3>
+                        <p style="font-size: 1.2rem; line-height: 1.8;">
+                            <strong>Malicious app update:</strong><br>
+                            Updated app could sign fake audio.
+                        </p>
+                        <p style="font-size: 1.2rem; line-height: 1.8; margin-top: 1rem;">
+                            <strong>Synthetic audio:</strong><br>
+                            App could sign TTS instead of mic.
+                        </p>
+                        <p style="font-size: 1.2rem; line-height: 1.8; margin-top: 1rem;">
+                            <strong>Compromised build:</strong><br>
+                            Modified APK could do anything.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide: Strengthening Trust -->
+        <div class="slide">
+            <div class="content">
+                <h2>How to Strengthen Trust</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    Additional layers you can add:
+                </p>
+                <div class="flow-diagram" style="flex-direction: column; gap: 1rem;">
+                    <div class="flow-box" style="width: 90%;">
+                        <strong>1. App Signature Verification</strong><br>
+                        Check APK is signed by known developer key
+                    </div>
+                    <div class="flow-box" style="width: 90%;">
+                        <strong>2. Reproducible Builds</strong><br>
+                        Anyone can verify the APK matches source code
+                    </div>
+                    <div class="flow-box" style="width: 90%;">
+                        <strong>3. Code Transparency</strong><br>
+                        Public source code audit trail
+                    </div>
+                    <div class="flow-box" style="width: 90%;">
+                        <strong>4. Multiple Attestations</strong><br>
+                        Cross-check with other devices/sensors
+                    </div>
+                    <div class="flow-box" style="width: 90%; background: rgba(144, 238, 144, 0.3);">
+                        <strong>5. Warden Verification</strong><br>
+                        Parse full attestation extension (we're missing this!)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide: What We're Missing -->
+        <div class="slide">
+            <div class="content">
+                <h2>⚠️ Current Implementation Gaps</h2>
+                <p class="big-text" style="margin-bottom: 2rem; color: #FFB347;">
+                    Honest assessment of what's missing:
+                </p>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;">✅ What We Have</h3>
+                        <ul style="font-size: 1.1rem; line-height: 1.8; list-style: none;">
+                            <li>✓ Certificate chain validation</li>
+                            <li>✓ ECDSA signature verification</li>
+                            <li>✓ Audio hash checking</li>
+                            <li>✓ Basic issuer name check</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;">❌ What We're Missing</h3>
+                        <ul style="font-size: 1.1rem; line-height: 1.8; list-style: none;">
+                            <li>✗ Attestation extension parsing</li>
+                            <li>✗ Challenge validation</li>
+                            <li>✗ Package name verification</li>
+                            <li>✗ Bootloader state check</li>
+                            <li>✗ Security patch validation</li>
+                            <li>✗ Hardware vs software proof</li>
+                        </ul>
+                    </div>
+                </div>
+                <p style="font-size: 1.2rem; margin-top: 2rem; opacity: 0.9;">
+                    <strong>Why?</strong> Didn't use Warden library (used wrong Maven coordinates).
+                    Should be <code>at.asitplus:warden</code>, not <code>app.cash.warden</code>.
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide: How to Fix It -->
+        <div class="slide">
+            <div class="content">
+                <h2>How to Properly Implement</h2>
+                <div class="code-block">
+// In server/build.gradle.kts, add:
+dependencies {
+    implementation("at.asitplus:warden:3.2.0")
+    // ... other deps
+}
+
+// Then in Verifier.kt:
+import at.asitplus.android.attestation.*
+
+val attestation = AndroidAttestationChecker()
+val result = attestation.verifyAttestation(
+    certificateChain = certChain,
+    expectedPackageName = "com.attestable.recorder",
+    requireStrongBox = true,  // Titan M2
+    allowBootloaderUnlock = true
+)
+
+if (result.isValid) {
+    // NOW we have real proof!
+}
+                </div>
+                <p class="big-text" style="margin-top: 1.5rem;">
+                    This would actually <span class="highlight">parse and validate</span>
+                    the attestation extension data.
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide: Bottom Line for Skeptics -->
+        <div class="slide">
+            <div class="content">
+                <h2>Bottom Line for Skeptics</h2>
+                <p class="big-text" style="margin-bottom: 2rem;">
+                    What can you actually trust right now?
+                </p>
+                <div class="card" style="max-width: 900px;">
+                    <h3 style="margin-bottom: 1.5rem; color: #ffd700;">Current State (Without Proper Warden)</h3>
+                    <ul style="font-size: 1.3rem; line-height: 2.2; list-style: none; text-align: left;">
+                        <li>✅ Signatures are valid (mathematically proven)</li>
+                        <li>✅ Audio hasn't been modified after signing</li>
+                        <li>✅ Certificate chain is structurally valid</li>
+                        <li>⚠️ Issuer says "StrongBox" but not cryptographically proven</li>
+                        <li>⚠️ App identity not verified</li>
+                        <li>❌ No proof app logic is correct</li>
+                        <li>❌ No protection against malicious app</li>
+                    </ul>
+                </div>
+                <p style="font-size: 1.3rem; margin-top: 2rem;">
+                    <strong>Verdict:</strong> Better than nothing, but needs Warden + app signing
+                    + reproducible builds for full trust.
+                </p>
+            </div>
+        </div>
+
+
+        <!-- Slide 17: Summary -->
+        <div class="slide">
+            <div class="content">
+                <h2>Summary</h2>
+                <div class="flow-diagram" style="flex-direction: column; gap: 1.5rem;">
+                    <div class="flow-box" style="width: 90%; background: rgba(255, 255, 255, 0.2);">
+                        <strong>1. Generate key in Titan M2</strong> → Get certificate chain
+                    </div>
+                    <div class="flow-box" style="width: 90%; background: rgba(255, 255, 255, 0.2);">
+                        <strong>2. Record audio</strong> → Sign each chunk with hardware key
+                    </div>
+                    <div class="flow-box" style="width: 90%; background: rgba(255, 255, 255, 0.2);">
+                        <strong>3. Export manifest</strong> → Contains certs + signatures
+                    </div>
+                    <div class="flow-box" style="width: 90%; background: rgba(255, 255, 255, 0.2);">
+                        <strong>4. Verify</strong> → Check chain + validate signatures
+                    </div>
+                    <div class="flow-box" style="width: 90%; background: rgba(144, 238, 144, 0.3); border-color: #90EE90;">
+                        <strong>Result: Cryptographic proof of authenticity!</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 18: End -->
+        <div class="slide">
+            <div class="content">
+                <div class="emoji-big">🎉</div>
+                <h1>Questions?</h1>
+                <p class="big-text" style="margin-top: 2rem;">
+                    Your attestable recording system is fully operational!
+                </p>
+                <div style="margin-top: 3rem;">
+                    <p style="font-size: 1.5rem; opacity: 0.8;">
+                        📖 Read more: README.md, TEE_INTEROP.md<br>
+                        🎤 Record: Attestable Recorder app<br>
+                        ✅ Verify: server/build/install/server/bin/server
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="prevBtn">← Previous</button>
+        <button id="nextBtn">Next →</button>
+    </div>
+
+    <div class="slide-counter">
+        <span id="currentSlide">1</span> / <span id="totalSlides">26</span>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const const totalSlides = slides.length;
+
+        document.getElementById('totalSlides').textContent = totalSlides;
+
+        function showSlide(n) {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (n + totalSlides) % totalSlides;
+            slides[currentSlide].classList.add('active');
+            document.getElementById('currentSlide').textContent = currentSlide + 1;
+        }
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            showSlide(currentSlide - 1);
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            showSlide(currentSlide + 1);
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') showSlide(currentSlide - 1);
+            if (e.key === 'ArrowRight') showSlide(currentSlide + 1);
+        });
+    </script>
+</body>
+</html>
