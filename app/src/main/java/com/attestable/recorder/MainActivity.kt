@@ -115,6 +115,16 @@ class MainActivity : AppCompatActivity() {
             isEnabled = false
         }
 
+        val btnRoom = Button(this).apply {
+            text = "Room mode: credible sensor for vibecode-room"
+            isEnabled = BuildConfig.FLAVOR == "room"
+            setOnClickListener {
+                // The room flavor's activity; resolved by name so the offline flavor compiles without it.
+                runCatching { startActivity(Intent(this@MainActivity, Class.forName("com.attestable.recorder.room.RoomActivity"))) }
+                    .onFailure { updateStatus("Room mode is only in the room flavor build") }
+            }
+        }
+
         btnExportManifest = Button(this).apply {
             text = "4. Export Attestation Manifest"
             setOnClickListener { exportManifest() }
@@ -134,6 +144,7 @@ class MainActivity : AppCompatActivity() {
         layout.addView(btnStartRecording)
         layout.addView(btnStopRecording)
         layout.addView(btnExportManifest)
+        if (BuildConfig.FLAVOR == "room") layout.addView(btnRoom)
         layout.addView(preview)
 
         val scrollView = ScrollView(this)

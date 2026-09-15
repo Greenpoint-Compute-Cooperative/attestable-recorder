@@ -8,7 +8,7 @@ code. (The other half — a signing key that *only* signs such builds — is fut
 
 ## What is reproducible
 
-The artifact is **`app-release-unsigned.apk`**. Signing is a separate, non-deterministic step
+The artifact is **`app-release-unsigned.apk`** — the **offline** flavor (`assembleOfflineRelease -PunsignedRelease`, written as `app-offline-release-unsigned.apk` and published under the shorter name). The `room` flavor (credible sensor for vibecode-room) adds INTERNET, OkHttp and MediaPipe and is a separate package; it is built the same way but is not the reproducibility target of the releases. Signing is a separate, non-deterministic step
 (ECDSA signatures are randomized), so the signed APK's hash differs on every signing run. What
 must match is the *content*: every zip entry of the signed APK equals the unsigned build's entry.
 `scripts/apk-compare.py` checks exactly that, ignoring only the signature block.

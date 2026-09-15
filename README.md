@@ -80,6 +80,28 @@ Kotlin JVM application using [Warden](https://github.com/a-sit-plus/warden-supre
 - `ChallengeStore.kt` - Verifier-issued, single-use challenges
 - `src/test/.../WardenGrapheneOsTest.kt` - Tests against a real GrapheneOS Pixel 7a attestation
 
+## Room mode: credible sensor for vibecode-room
+
+The **room** flavor (`./gradlew :app:assembleRoomDebug`, package `com.attestable.recorder.room`)
+turns the phone into a verifiable input for a [vibecode-room](https://github.com/RonTuretzky/vibecode-room)
+wall: audio to the room's `/api/mic` socket, on-device MediaPipe hand tracking and body-pose
+tracking to its `/hands/ws` guest-cursor socket — each stream signed in the Titan M2 in short
+windows and verified by the room against the bytes it actually received. This flavor has the
+INTERNET permission; the default **offline** flavor still does not.
+
+```bash
+# next to the room server (JVM 17): hardware verification of every phone that joins
+server/build/install/attestable-verifier/bin/attestable-verifier serve --port 8790 \
+  --package com.attestable.recorder.room --signer <apk signer sha256>
+VIBERSYN_ATTEST_VERIFIER_URL=http://127.0.0.1:8790 bun run dev      # in vibecode-room
+# on the phone: Room mode → room URL → Start. Or, over adb:
+adb reverse tcp:8787 tcp:8787
+adb shell am start -n com.attestable.recorder.room/com.attestable.recorder.room.RoomActivity \
+  --es room_url http://127.0.0.1:8787 --ez audio true --ez hands true --ez gesture true --ez autostart true
+```
+
+Protocol and what the room checks: `docs/credible-sensors.md` in the vibecode-room repo.
+
 ## Security Guarantees
 
 When verification succeeds, you have cryptographic proof that:

@@ -66,7 +66,7 @@ object ChunkVerifier {
     private fun applyChainCheck(manifest: RecordingManifest, results: List<ChunkResult>): List<ChunkResult> {
         val byChunk = results.associateBy { it.chunk }
         val updated = HashMap(byChunk)
-        for (type in listOf(ChunkType.AUDIO, ChunkType.VIDEO)) {
+        for (type in listOf(ChunkType.AUDIO, ChunkType.VIDEO, ChunkType.HANDS, ChunkType.GESTURE)) {
             val stream = manifest.chunks(type)
             var expectedPrev = SignedPayload.ZERO_HASH
             for (c in stream) {
@@ -92,7 +92,7 @@ object ChunkVerifier {
     /** Gaps, overlaps, out-of-order or missing indexes per stream. Warnings, not failures: the signatures still hold. */
     fun continuityWarnings(manifest: RecordingManifest): List<String> {
         val warnings = mutableListOf<String>()
-        for (type in listOf(ChunkType.AUDIO, ChunkType.VIDEO)) {
+        for (type in listOf(ChunkType.AUDIO, ChunkType.VIDEO, ChunkType.HANDS, ChunkType.GESTURE)) {
             val chunks = manifest.chunks(type)
             if (chunks.isEmpty()) continue
             val indexes = chunks.map { it.index }
