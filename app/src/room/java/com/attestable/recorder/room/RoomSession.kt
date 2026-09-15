@@ -175,7 +175,7 @@ class RoomSession(
     private fun post(record: ChunkRecord) {
         chunks += record
         val sid = sourceId ?: return
-        exec.execute {
+        val task = Runnable {
             val body = JSONObject()
                 .put("source_id", sid).put("type", record.type.wireName).put("index", record.index)
                 .put("timestamp", record.timestampMs).put("duration_ms", record.durationMs).put("size", record.size)
@@ -188,6 +188,8 @@ class RoomSession(
             }
             publishStats()
         }
+        // After shutdown (final flush racing a stop) post inline rather than lose the record.
+        try { exec.execute(task) } catch (e: java.util.concurrent.RejectedExecutionException) { task.run() }
     }
 
     private fun publishStats() {
@@ -200,7 +202,8 @@ class RoomSession(
 
     /** Stops capture, flushes the last chunks, seals the session with the room. Blocking. */
     fun stop() {
-        exec.shutdown()
+        // Order matters: stop capture → flush the last windows (their records are posted through
+        // `exec`) → only then shut the executor down and wait for the posts to land.
         runCatching { audio?.stop() }
         runCatching { camera?.stop() }
         runCatching { handsTracker?.close() }
@@ -210,8 +213,9 @@ class RoomSession(
         val endedAt = System.currentTimeMillis()
         val list = chunks.toList()
         val sessionSig = signer.signSession(list, startedAtMs, endedAt, RecordingContext.digest(contextSnapshots))
+        exec.shutdown()
         // Let in-flight chunk posts land before the close (the room checks the count).
-        runCatching { exec.awaitTermination(5, TimeUnit.SECONDS) }
+        runCatching { exec.awaitTermination(8, TimeUnit.SECONDS) }
         sourceId?.let { sid ->
             val body = JSONObject()
                 .put("started_at", startedAtMs).put("ended_at", endedAt)
