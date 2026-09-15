@@ -28,3 +28,6 @@ challenges/
 keystore.properties
 *.jks
 *.keystore
+
+# Room flavor: MediaPipe models are downloaded at build time (pinned by SHA-256 in app/build.gradle.kts)
+app/src/room/assets/models/

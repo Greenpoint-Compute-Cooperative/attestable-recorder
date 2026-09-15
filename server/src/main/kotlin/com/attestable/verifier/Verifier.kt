@@ -266,6 +266,8 @@ Usage:
   verifier issue-challenge [--ttl <minutes>] [--challenge-store <dir>]
   verifier <manifest.json> <chunks_dir> --signer <sha256-hex> [options]
   verifier --inspect <manifest.json>
+  verifier serve --signer <sha256-hex> [--port 8790] [--bind 127.0.0.1] [policy options]
+                                 HTTP attestation service for rooms (POST /challenge, POST /attest, GET /health)
 
 Freshness flow:
   1. `verifier issue-challenge` prints a fresh challenge (and remembers it in the store).
@@ -307,6 +309,8 @@ fun main(args: Array<String>) {
     var requireIssuedChallenge = false
     var ttlMinutes = ChallengeStore.DEFAULT_TTL.toMinutes()
     var exportDir: File? = null
+    var servePort = 8790
+    var serveBind = "127.0.0.1"
 
     fun fail(message: String): Nothing {
         System.err.println("ERROR: $message")
@@ -331,6 +335,8 @@ fun main(args: Array<String>) {
             "--require-issued-challenge" -> requireIssuedChallenge = true
             "--ttl" -> ttlMinutes = next(a).toLongOrNull() ?: fail("--ttl must be a number of minutes")
             "--export" -> exportDir = File(next(a))
+            "--port" -> servePort = next(a).toIntOrNull() ?: fail("--port must be a number")
+            "--bind" -> serveBind = next(a)
             "-h", "--help" -> { println(USAGE); exitProcess(0) }
             else -> if (a.startsWith("--")) fail("Unknown option $a") else positional += a
         }
@@ -373,6 +379,23 @@ fun main(args: Array<String>) {
         printAttestationSummary(ext, "   ")
         ChunkVerifier.continuityWarnings(manifest).forEach { println("⚠️  $it") }
         exitProcess(0)
+    }
+
+    if (positional.firstOrNull() == "serve") {
+        if (signers.isEmpty()) fail("serve needs at least one --signer fingerprint")
+        val policy = WardenPolicy(
+            packageName = packageName,
+            signerFingerprints = signers,
+            requireStrongBox = requireStrongBox,
+            allowUnlockedBootloader = allowUnlockedBootloader,
+            verifiedBootKeys = (if (useGrapheneKeys) GrapheneOsBootKeys.digests else emptySet()) + extraBootKeys + VerifiedBootKey.OEM,
+            checkRevocation = checkRevocation,
+        )
+        if (allowUnlockedBootloader) println("⚠️  --allow-unlocked-bootloader: boot checks DISABLED. Demo use only.")
+        val server = Serve(policy, ChallengeStore(challengeStoreDir), Duration.ofMinutes(ttlMinutes)).start(serveBind, servePort)
+        println("🛡️  attestation service listening on http://$serveBind:${server.address.port}  (policy: package=$packageName, strongBox=$requireStrongBox)")
+        println("   POST /challenge · POST /attest · GET /health   — Ctrl-C to stop")
+        Thread.currentThread().join()
     }
 
     if (positional.size < 2) fail("manifest and chunks directory are required")

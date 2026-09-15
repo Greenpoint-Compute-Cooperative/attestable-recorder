@@ -7,10 +7,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ./gradlew --no-daemon -q clean >/dev/null
-./gradlew --no-daemon -q :app:assembleRelease -PunsignedRelease
-APK=app/build/outputs/apk/release/app-release-unsigned.apk
+./gradlew --no-daemon -q :app:assembleOfflineRelease -PunsignedRelease
+APK=app/build/outputs/apk/offline/release/app-offline-release-unsigned.apk
 echo "toolchain: $(java -version 2>&1 | head -1 | tr -d '"') · $(grep distributionUrl gradle/wrapper/gradle-wrapper.properties | sed 's/.*\///')"
-echo "app-release-unsigned.apk sha256: $(shasum -a 256 "$APK" | cut -d' ' -f1)"
+echo "app-offline-release-unsigned.apk sha256: $(shasum -a 256 "$APK" | cut -d' ' -f1)"
 if [ $# -ge 1 ]; then
   python3 scripts/apk-compare.py "$APK" "$1"
 fi

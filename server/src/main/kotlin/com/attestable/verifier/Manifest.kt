@@ -14,7 +14,11 @@ import java.util.UUID
 enum class ChunkType(val code: Byte, val wireName: String) {
     SESSION(0x00, "session"),
     AUDIO(0x01, "audio"),
-    VIDEO(0x02, "video");
+    VIDEO(0x02, "video"),
+    /** Hand-camera frames: newline-terminated JSON cursor/flyhands frames exactly as sent to the room. */
+    HANDS(0x03, "hands"),
+    /** Gesture-camera frames: newline-terminated JSON cursor frames from body-pose tracking, as sent. */
+    GESTURE(0x04, "gesture");
 
     companion object {
         fun fromWire(name: String) = entries.firstOrNull { it.wireName == name }
@@ -197,6 +201,8 @@ data class RecordingManifest(
         fun defaultFileName(recordingId: String, type: ChunkType, index: Int) = when (type) {
             ChunkType.AUDIO -> "${recordingId}_chunk_$index.pcm"
             ChunkType.VIDEO -> "${recordingId}_video_$index.mp4"
+            ChunkType.HANDS -> "${recordingId}_hands_$index.jsonl"
+            ChunkType.GESTURE -> "${recordingId}_gesture_$index.jsonl"
             ChunkType.SESSION -> error("session has no file")
         }
 

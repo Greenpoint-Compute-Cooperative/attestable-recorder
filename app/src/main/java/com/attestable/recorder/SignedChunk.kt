@@ -65,7 +65,11 @@ object SignedPayload {
 enum class ChunkType(val code: Byte, val wireName: String) {
     SESSION(0x00, "session"),
     AUDIO(0x01, "audio"),
-    VIDEO(0x02, "video");
+    VIDEO(0x02, "video"),
+    /** Hand-camera frames: newline-terminated JSON cursor/flyhands frames exactly as sent to the room. */
+    HANDS(0x03, "hands"),
+    /** Gesture-camera frames: newline-terminated JSON cursor frames from body-pose tracking, as sent. */
+    GESTURE(0x04, "gesture");
 }
 
 /** One signed chunk as it appears in the manifest. */

@@ -1,4 +1,5 @@
-# Pinned build environment for reproducing app-release-unsigned.apk.
+# Pinned build environment for reproducing app-release-unsigned.apk (the OFFLINE flavor;
+# the room flavor pulls MediaPipe models and is not the reproducibility target).
 #
 #   docker build -t attestable-recorder-build .
 #   docker run --rm -v "$PWD/out:/out" attestable-recorder-build
@@ -29,8 +30,8 @@ COPY . /src
 # Never bake signing material into the image.
 RUN rm -f keystore.properties release.jks
 
-RUN ./gradlew --no-daemon -q :app:assembleRelease -PunsignedRelease \
- && shasum -a 256 app/build/outputs/apk/release/app-release-unsigned.apk
+RUN ./gradlew --no-daemon -q :app:assembleOfflineRelease -PunsignedRelease \
+ && shasum -a 256 app/build/outputs/apk/offline/release/app-offline-release-unsigned.apk
 
-CMD mkdir -p /out && cp app/build/outputs/apk/release/app-release-unsigned.apk /out/ \
+CMD mkdir -p /out && cp app/build/outputs/apk/offline/release/app-offline-release-unsigned.apk /out/app-release-unsigned.apk \
  && shasum -a 256 /out/app-release-unsigned.apk | tee /out/SHA256SUMS

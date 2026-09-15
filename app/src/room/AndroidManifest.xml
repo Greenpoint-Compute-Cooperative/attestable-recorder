@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Room flavor streams to a room server on the LAN; the offline flavor has no INTERNET. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application android:usesCleartextTraffic="true">
+        <activity
+            android:name=".room.RoomActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:label="Credible Sensor (room mode)" />
+    </application>
+</manifest>
