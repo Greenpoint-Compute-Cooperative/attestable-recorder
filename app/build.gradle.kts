@@ -23,8 +23,8 @@ android {
         applicationId = "com.attestable.recorder"
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     signingConfigs {
@@ -127,7 +127,11 @@ val downloadRoomModels by tasks.registering {
     }
 }
 tasks.configureEach {
-    if (name.startsWith("merge") && name.contains("Room") && name.endsWith("Assets")) dependsOn(downloadRoomModels)
+    // Every room-flavor task that reads src/room/assets (asset merging, lint's model writer) must
+    // run after the download, or Gradle's implicit-dependency validation fails the release build.
+    if (name.contains("Room") && name != downloadRoomModels.name && (name.contains("Assets") || name.lowercase().contains("lint"))) {
+        dependsOn(downloadRoomModels)
+    }
 }
 
 dependencies {

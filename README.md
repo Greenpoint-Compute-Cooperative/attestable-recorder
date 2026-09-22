@@ -82,25 +82,34 @@ Kotlin JVM application using [Warden](https://github.com/a-sit-plus/warden-supre
 
 ## Room mode: credible sensor for vibecode-room
 
-The **room** flavor (`./gradlew :app:assembleRoomDebug`, package `com.attestable.recorder.room`)
-turns the phone into a verifiable input for a [vibecode-room](https://github.com/RonTuretzky/vibecode-room)
+The **room** flavor (`./gradlew :app:assembleRoomRelease`, package `com.attestable.recorder.room`)
+turns the phone into a verifiable input for the
+[verifiable vibe code room](https://github.com/Greenpoint-Compute-Cooperative/verifiable-vibe-code-room)
 wall: audio to the room's `/api/mic` socket, on-device MediaPipe hand tracking and body-pose
 tracking to its `/hands/ws` guest-cursor socket — each stream signed in the Titan M2 in short
 windows and verified by the room against the bytes it actually received. This flavor has the
 INTERNET permission; the default **offline** flavor still does not.
 
+**Two packages, one signer.** The verifier's `--package` must match the flavor that generated
+the key: `com.attestable.recorder` for the offline recorder, `com.attestable.recorder.room` for
+room mode. Both release APKs are signed with the same release certificate, so `--signer` is the
+same fingerprint (printed in the release notes).
+
 ```bash
-# next to the room server (JVM 17): hardware verification of every phone that joins
-server/build/install/attestable-verifier/bin/attestable-verifier serve --port 8790 \
-  --package com.attestable.recorder.room --signer <apk signer sha256>
-VIBERSYN_ATTEST_VERIFIER_URL=http://127.0.0.1:8790 bun run dev      # in vibecode-room
+# next to the room server (JVM 17 or newer; the verifier zip ships with each release):
+attestable-verifier-1.1.0/bin/attestable-verifier serve --port 8795 \
+  --package com.attestable.recorder.room --signer <release signer sha256>
+VIBERSYN_ATTEST_VERIFIER_URL=http://127.0.0.1:8795 bun run dev      # in the room repo
 # on the phone: Room mode → room URL → Start. Or, over adb:
 adb reverse tcp:8787 tcp:8787
 adb shell am start -n com.attestable.recorder.room/com.attestable.recorder.room.RoomActivity \
   --es room_url http://127.0.0.1:8787 --ez audio true --ez hands true --ez gesture true --ez autostart true
 ```
 
-Protocol and what the room checks: `docs/credible-sensors.md` in the vibecode-room repo.
+Port 8795 is used in the docs because the room's optional HTTPS guest-hands listener defaults to
+a port near 8790. `serve` binds 127.0.0.1 by default; pass `--bind 0.0.0.0` only if the room
+server runs on another machine. Protocol and what the room checks: `docs/credible-sensors.md`
+in the room repo.
 
 ## Security Guarantees
 
